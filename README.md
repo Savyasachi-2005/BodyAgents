@@ -44,8 +44,6 @@ npm run dev
 
 Open http://localhost:3001
 
-`NEXT_PUBLIC_*` vars are read from the **repo root** `.env` (`vite` `envDir`).
 
-## Removed starter junk
 
-Unused vinext/D1 scaffolding was deleted (`examples/`, empty `db/`/`drizzle/`, ChatGPT auth helper, starter tests).
+
