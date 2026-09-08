@@ -2,23 +2,10 @@
 
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { ChevronDown, LogOut, UserRound } from "lucide-react";
-
-type AuthUser = {
-  id: string;
-  name: string;
-  email: string;
-  initials: string;
-};
-
-const TOKEN_KEY = "bodyagents_token";
-
-function apiBase(): string {
-  return process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
-}
+import { apiBase, useAuth } from "../lib/auth-context";
 
 export function AuthMenu() {
-  const [user, setUser] = useState<AuthUser | null>(null);
-  const [open, setOpen] = useState(false);
+  const { user, loginOpen, setLoginOpen, setSession, logout } = useAuth();
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -28,32 +15,13 @@ export function AuthMenu() {
   const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const token = localStorage.getItem(TOKEN_KEY);
-    if (!token) return;
-    void fetch(`${apiBase()}/api/v1/auth/me`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then(async (response) => {
-        if (!response.ok) {
-          localStorage.removeItem(TOKEN_KEY);
-          return;
-        }
-        const data = (await response.json()) as { user: AuthUser };
-        setUser(data.user);
-      })
-      .catch(() => {
-        /* backend may be offline */
-      });
-  }, []);
-
-  useEffect(() => {
-    if (!open) return;
+    if (!loginOpen) return;
     const onPointer = (event: MouseEvent) => {
-      if (!panelRef.current?.contains(event.target as Node)) setOpen(false);
+      if (!panelRef.current?.contains(event.target as Node)) setLoginOpen(false);
     };
     window.addEventListener("mousedown", onPointer);
     return () => window.removeEventListener("mousedown", onPointer);
-  }, [open]);
+  }, [loginOpen, setLoginOpen]);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -61,10 +29,7 @@ export function AuthMenu() {
     setError(null);
     try {
       const path = mode === "signup" ? "/api/v1/auth/signup" : "/api/v1/auth/login";
-      const body =
-        mode === "signup"
-          ? { name, email, password }
-          : { email, password };
+      const body = mode === "signup" ? { name, email, password } : { email, password };
       const response = await fetch(`${apiBase()}${path}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -81,28 +46,13 @@ export function AuthMenu() {
               : "Authentication failed";
         throw new Error(message);
       }
-      localStorage.setItem(TOKEN_KEY, data.token);
-      setUser(data.user);
+      setSession(data.token, data.user);
       setPassword("");
-      setOpen(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Authentication failed");
     } finally {
       setBusy(false);
     }
-  };
-
-  const logout = async () => {
-    const token = localStorage.getItem(TOKEN_KEY);
-    if (token) {
-      await fetch(`${apiBase()}/api/v1/auth/logout`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-      }).catch(() => undefined);
-    }
-    localStorage.removeItem(TOKEN_KEY);
-    setUser(null);
-    setOpen(false);
   };
 
   return (
@@ -111,14 +61,14 @@ export function AuthMenu() {
         className="profile"
         type="button"
         aria-label={user ? "Open account menu" : "Sign in"}
-        aria-expanded={open}
-        onClick={() => setOpen((value) => !value)}
+        aria-expanded={loginOpen}
+        onClick={() => setLoginOpen(!loginOpen)}
       >
         <span>{user?.initials ?? "?"}</span>
         <ChevronDown size={15} />
       </button>
 
-      {open && (
+      {loginOpen && (
         <div className="auth-panel" role="dialog" aria-label="Account">
           {user ? (
             <>
@@ -129,7 +79,14 @@ export function AuthMenu() {
                   <small>{user.email}</small>
                 </div>
               </div>
-              <button type="button" className="auth-logout" onClick={logout}>
+              <button
+                type="button"
+                className="auth-logout"
+                onClick={async () => {
+                  await logout();
+                  setLoginOpen(false);
+                }}
+              >
                 <LogOut size={14} /> Sign out
               </button>
             </>

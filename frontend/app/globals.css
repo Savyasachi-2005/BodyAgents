@@ -218,6 +218,84 @@ button:focus-visible, input:focus-visible, canvas:focus-visible {
 }
 .auth-form > button:disabled { opacity: 0.55; cursor: not-allowed; }
 .auth-error { margin: 0; color: #b44; font-size: 11px; }
+
+.notes-panel {
+  width: min(520px, 92vw);
+  max-height: min(78vh, 640px);
+  overflow: auto;
+  border-radius: 22px;
+  background: #fffaf3;
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+  padding: 22px 20px 18px;
+  position: relative;
+}
+.notes-header {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin-bottom: 14px;
+  color: #6d568f;
+}
+.notes-header em {
+  display: block;
+  text-transform: uppercase;
+  font-size: 10px;
+}
+.notes-header h2 {
+  margin: 2px 0 0;
+  font: 500 28px/1 var(--font-serif), serif;
+  color: var(--ink);
+}
+.notes-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.notes-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.notes-item {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(255,255,255,.55);
+}
+.notes-item small {
+  display: block;
+  margin-bottom: 4px;
+  color: #86663c;
+  font-size: 10px;
+}
+.notes-item p {
+  margin: 0;
+  white-space: pre-wrap;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--ink);
+}
+.notes-item button {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: transparent;
+  color: #b44;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
 .mobile-library-trigger { display: none; }
 
 .workspace {
@@ -493,6 +571,34 @@ button:focus-visible, input:focus-visible, canvas:focus-visible {
   line-height: 1.4;
   white-space: pre-wrap;
 }
+.chat-bubble p { margin: 0; }
+.note-it {
+  margin-top: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid rgba(255,255,255,.35);
+  border-radius: 999px;
+  background: rgba(255,255,255,.18);
+  color: inherit;
+  font-size: 10px;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+.chat-bubble.assistant .note-it,
+.chat-bubble.user .note-it {
+  border-color: rgba(110, 136, 189, 0.35);
+  color: #6e88bd;
+  background: rgba(255,255,255,.55);
+}
+.chat-bubble.user .note-it {
+  border-color: rgba(255,255,255,.45);
+  color: #fff;
+  background: rgba(255,255,255,.16);
+}
+.note-it.saved {
+  opacity: 0.8;
+}
 .chat-bubble.user {
   align-self: flex-end;
   background: linear-gradient(110deg, #ed8a72, #e87868);
@@ -537,7 +643,25 @@ button:focus-visible, input:focus-visible, canvas:focus-visible {
   place-items: center;
   cursor: pointer;
 }
-.chat-form button:disabled { opacity: 0.45; cursor: not-allowed; }
+.chat-lock-body {
+  padding: 18px 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+.chat-lock-body p { margin: 0; }
+.chat-lock-body button {
+  min-height: 36px;
+  border: 0;
+  border-radius: 10px;
+  background: linear-gradient(110deg, #ed8a72, #e87868);
+  color: #fff;
+  cursor: pointer;
+  font-size: 12px;
+}
 
 .learning-cards {
   /* Cap on the artwork box. The source illustrations are square, so this is

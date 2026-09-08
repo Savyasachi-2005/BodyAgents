@@ -24,6 +24,11 @@ export type Organ = {
   scientificName: string;
   system: string;
   model: string;
+  /**
+   * Euler XYZ radians applied to the mesh before fit/centering.
+   * Use when a scan is authored on its side (e.g. skeleton along Z).
+   */
+  modelRotation?: [number, number, number];
   icon: string;
   accent: string;
   description: string;
@@ -143,6 +148,8 @@ export const organs: Organ[] = [
     scientificName: "Os",
     system: "Skeletal System",
     model: "/models/bones.glb",
+    // Scan is authored with height along Z; tip upright onto +Y before fitting.
+    modelRotation: [Math.PI / 2, Math.PI, 0],
     icon: "⬡",
     accent: "#b8a07a",
     description: "Bones form the sturdy frame that shapes your body, protects organs, and works with muscles so you can move.",

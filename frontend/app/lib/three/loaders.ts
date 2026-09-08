@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader.js";
 import { MeshoptDecoder } from "three/examples/jsm/libs/meshopt_decoder.module.js";
 import { disposeObject } from "./dispose";
 
@@ -9,16 +10,27 @@ export const FIT_SIZE = 3.8;
 
 const CACHE_LIMIT = 3;
 
+export type ModelAlign = {
+  /** Euler XYZ radians applied before bounding-box fit. */
+  rotation?: [number, number, number];
+  /** Albedo used when the mesh has no texture map (common for scan exports). */
+  baseColor?: string;
+  /** Rest pose of the animated pivot (defaults to a slight specimen tilt). */
+  pivotRotation?: [number, number, number];
+};
+
 export type LoadedOrgan = {
   url: string;
   /** Hotspot space: the fitted model, centred on the origin, spanning FIT_SIZE. */
   pivot: THREE.Group;
   meshes: THREE.Mesh[];
   mixer: THREE.AnimationMixer | null;
+  restRotation: [number, number, number];
 };
 
 export class AnatomyAssetManager {
   private loader: GLTFLoader;
+  private draco: DRACOLoader;
   private cache = new Map<string, LoadedOrgan>();
   private inflight = new Map<string, Promise<LoadedOrgan>>();
   private current: LoadedOrgan | null = null;
@@ -28,7 +40,12 @@ export class AnatomyAssetManager {
     // Anisotropy is what stops the texture detail from crawling at grazing
     // angles, which is most of the shimmer on a rotating organ.
     this.maxAnisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
-    this.loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
+    this.draco = new DRACOLoader();
+    // Served from /public/draco — required for bones.glb (KHR_draco_mesh_compression).
+    this.draco.setDecoderPath("/draco/");
+    this.loader = new GLTFLoader()
+      .setDRACOLoader(this.draco)
+      .setMeshoptDecoder(MeshoptDecoder);
   }
 
   get hasAnimation() {
@@ -41,36 +58,57 @@ export class AnatomyAssetManager {
     void fetch(url, { priority: "low" } as RequestInit).catch(() => {});
   }
 
-  async load(url: string, onProgress?: (progress: number) => void): Promise<LoadedOrgan> {
-    const cached = this.cache.get(url);
+  private cacheKey(url: string, align?: ModelAlign) {
+    const rotation = align?.rotation?.join(",") ?? "";
+    const pivot = align?.pivotRotation?.join(",") ?? "";
+    return `${url}|${rotation}|${pivot}|${align?.baseColor ?? ""}`;
+  }
+
+  async load(
+    url: string,
+    onProgress?: (progress: number) => void,
+    align?: ModelAlign,
+  ): Promise<LoadedOrgan> {
+    const key = this.cacheKey(url, align);
+    const cached = this.cache.get(key);
     if (cached) {
-      this.cache.delete(url);
-      this.cache.set(url, cached);
+      this.cache.delete(key);
+      this.cache.set(key, cached);
       this.resetMaterials(cached);
       onProgress?.(1);
       this.current = cached;
       return cached;
     }
 
-    const pending = this.inflight.get(url) ?? this.parse(url, onProgress);
-    this.inflight.set(url, pending);
+    const pending = this.inflight.get(key) ?? this.parse(url, onProgress, align);
+    this.inflight.set(key, pending);
     try {
       const organ = await pending;
-      this.cache.set(url, organ);
+      this.cache.set(key, organ);
       this.evict();
       this.current = organ;
       return organ;
     } finally {
-      this.inflight.delete(url);
+      this.inflight.delete(key);
     }
   }
 
-  private async parse(url: string, onProgress?: (progress: number) => void): Promise<LoadedOrgan> {
+  private async parse(
+    url: string,
+    onProgress?: (progress: number) => void,
+    align?: ModelAlign,
+  ): Promise<LoadedOrgan> {
     const gltf = await this.loader.loadAsync(url, (event) => {
       if (event.total > 0) onProgress?.(event.loaded / event.total);
     });
 
     const model = gltf.scene;
+    if (align?.rotation) {
+      model.rotation.set(align.rotation[0], align.rotation[1], align.rotation[2], "XYZ");
+      model.updateMatrixWorld(true);
+    }
+
+    // Fit after alignment so the upright pose is what gets centered/scaled.
     const box = new THREE.Box3().setFromObject(model);
     const size = box.getSize(new THREE.Vector3());
     const center = box.getCenter(new THREE.Vector3());
@@ -83,9 +121,11 @@ export class AnatomyAssetManager {
     const pivot = new THREE.Group();
     pivot.name = "organ-pivot";
     pivot.add(model);
-    pivot.rotation.set(0.05, -0.28, 0);
+    const restRotation: [number, number, number] = align?.pivotRotation ?? [0.05, -0.28, 0];
+    pivot.rotation.set(restRotation[0], restRotation[1], restRotation[2]);
 
     const meshes: THREE.Mesh[] = [];
+    const fallbackColor = align?.baseColor ? new THREE.Color(align.baseColor) : null;
     model.traverse((child) => {
       if (!(child instanceof THREE.Mesh)) return;
       meshes.push(child);
@@ -96,6 +136,29 @@ export class AnatomyAssetManager {
       // saves a full extra pass over the mesh every frame.
       child.castShadow = false;
       child.receiveShadow = false;
+
+      // Promote basic/lambert/phong scan materials to standard so lighting matches
+      // the rest of the specimen shelf.
+      const raw = Array.isArray(child.material) ? child.material : [child.material];
+      const promoted = raw.map((material) => {
+        if (material instanceof THREE.MeshStandardMaterial) return material;
+        const color =
+          material && "color" in material && material.color instanceof THREE.Color
+            ? material.color.clone()
+            : new THREE.Color(0xd8cfc0);
+        const map =
+          material && "map" in material ? ((material.map as THREE.Texture | null) ?? null) : null;
+        const next = new THREE.MeshStandardMaterial({
+          color,
+          map,
+          roughness: 0.55,
+          metalness: 0,
+        });
+        material.dispose();
+        return next;
+      });
+      child.material = promoted.length === 1 ? promoted[0] : promoted;
+
       this.forEachMaterial(child, (material) => {
         material.transparent = false;
         material.opacity = 1;
@@ -103,6 +166,7 @@ export class AnatomyAssetManager {
         material.depthTest = true;
         material.side = THREE.FrontSide;
         if (material instanceof THREE.MeshStandardMaterial) {
+          if (fallbackColor && !material.map) material.color.copy(fallbackColor);
           // A tighter specular lobe sparkles on any surface with normal detail;
           // holding roughness a little higher keeps highlights stable while the
           // model turns.
@@ -151,12 +215,12 @@ export class AnatomyAssetManager {
       gltf.animations.forEach((clip) => mixer?.clipAction(clip).play());
     }
 
-    return { url, pivot, meshes, mixer };
+    return { url, pivot, meshes, mixer, restRotation };
   }
 
   /** Undoes viewer tools (wireframe, clipping, fade) before a cached organ returns. */
   private resetMaterials(organ: LoadedOrgan) {
-    organ.pivot.rotation.set(0.05, -0.28, 0);
+    organ.pivot.rotation.set(organ.restRotation[0], organ.restRotation[1], organ.restRotation[2]);
     organ.pivot.position.set(0, 0, 0);
     organ.meshes.forEach((mesh) => {
       this.forEachMaterial(mesh, (material) => {
@@ -209,5 +273,6 @@ export class AnatomyAssetManager {
     this.release();
     this.cache.forEach((organ) => this.destroy(organ));
     this.cache.clear();
+    this.draco.dispose();
   }
 }

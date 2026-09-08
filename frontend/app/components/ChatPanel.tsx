@@ -1,8 +1,10 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import { MessageCircle, Send, Sparkles } from "lucide-react";
+import { Lock, MessageCircle, NotebookPen, Send, Sparkles } from "lucide-react";
+import { useAuth } from "../lib/auth-context";
 import { personaLabels, type PersonaId } from "../lib/personas";
+import { addNote } from "../lib/notes";
 
 type ChatMessage = {
   id: string;
@@ -12,23 +14,33 @@ type ChatMessage = {
 
 type Props = {
   philosopherId: PersonaId;
+  onOpenNotes?: () => void;
 };
 
 function wsBaseUrl(): string {
-  return process.env.NEXT_PUBLIC_WS_URL ?? "ws://localhost:8000";
+  return process.env.NEXT_PUBLIC_WS_URL ?? "ws://localhost:8001";
 }
 
-export function ChatPanel({ philosopherId }: Props) {
-  const [sessionId] = useState(() =>
+function getOrCreateSessionId(philosopherId: PersonaId, userId: string): string {
+  const key = `bodyagents_chat_session_${userId}_${philosopherId}`;
+  const existing = sessionStorage.getItem(key);
+  if (existing) return existing;
+  const created =
     typeof crypto !== "undefined" && "randomUUID" in crypto
       ? crypto.randomUUID()
-      : `session-${Date.now()}`,
-  );
+      : `session-${Date.now()}`;
+  sessionStorage.setItem(key, created);
+  return created;
+}
+
+export function ChatPanel({ philosopherId, onOpenNotes }: Props) {
+  const { user, requireAuth } = useAuth();
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [streaming, setStreaming] = useState(false);
   const [status, setStatus] = useState<"idle" | "connecting" | "open" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
+  const [notedIds, setNotedIds] = useState<Set<string>>(new Set());
   const socketRef = useRef<WebSocket | null>(null);
   const assistantIdRef = useRef<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -46,16 +58,36 @@ export function ChatPanel({ philosopherId }: Props) {
       {
         id: "welcome",
         role: "system",
-        content: `Hi! I'm ${title}. Ask me anything about how I work in the body.`,
+        content: user
+          ? `Hi! I'm ${title}. Ask me anything about how I work in the body.`
+          : `Sign in to chat with ${title} and save notes from our conversation.`,
       },
     ]);
     setStreaming(false);
     setError(null);
     setStatus("idle");
-  }, [philosopherId, title]);
+    setNotedIds(new Set());
+  }, [philosopherId, title, user]);
+
+  useEffect(() => {
+    const onLogout = () => {
+      socketRef.current?.close();
+      socketRef.current = null;
+      setStreaming(false);
+      setStatus("idle");
+      setNotedIds(new Set());
+      setMessages([]);
+    };
+    window.addEventListener("bodyagents:auth-logout", onLogout);
+    return () => window.removeEventListener("bodyagents:auth-logout", onLogout);
+  }, []);
 
   const ensureSocket = () =>
     new Promise<WebSocket>((resolve, reject) => {
+      if (!user) {
+        reject(new Error("Not signed in"));
+        return;
+      }
       const existing = socketRef.current;
       if (existing && existing.readyState === WebSocket.OPEN) {
         resolve(existing);
@@ -63,7 +95,8 @@ export function ChatPanel({ philosopherId }: Props) {
       }
 
       setStatus("connecting");
-      const url = `${wsBaseUrl()}/api/v1/ws/chat/${philosopherId}/${sessionId}`;
+      const activeSessionId = getOrCreateSessionId(philosopherId, user.id);
+      const url = `${wsBaseUrl()}/api/v1/ws/chat/${philosopherId}/${activeSessionId}`;
       const socket = new WebSocket(url);
       socketRef.current = socket;
 
@@ -75,7 +108,7 @@ export function ChatPanel({ philosopherId }: Props) {
 
       socket.onerror = () => {
         setStatus("error");
-        setError("Could not reach BodyAgents API. Is the backend running on port 8000?");
+        setError("Could not reach BodyAgents API. Is the backend running?");
         reject(new Error("WebSocket error"));
       };
 
@@ -88,21 +121,23 @@ export function ChatPanel({ philosopherId }: Props) {
 
       socket.onmessage = (event) => {
         const raw = String(event.data);
-        try {
-          const parsed = JSON.parse(raw) as { type?: string; message?: string };
-          if (parsed.type === "done") {
-            setStreaming(false);
-            assistantIdRef.current = null;
-            return;
+        if (raw.startsWith("{") && raw.endsWith("}")) {
+          try {
+            const parsed = JSON.parse(raw) as { type?: string; message?: string };
+            if (parsed.type === "done") {
+              setStreaming(false);
+              assistantIdRef.current = null;
+              return;
+            }
+            if (parsed.type === "error") {
+              setStreaming(false);
+              setError(parsed.message ?? "Agent error");
+              assistantIdRef.current = null;
+              return;
+            }
+          } catch {
+            // token chunk
           }
-          if (parsed.type === "error") {
-            setStreaming(false);
-            setError(parsed.message ?? "Agent error");
-            assistantIdRef.current = null;
-            return;
-          }
-        } catch {
-          // token chunk
         }
 
         const assistantId = assistantIdRef.current;
@@ -122,8 +157,22 @@ export function ChatPanel({ philosopherId }: Props) {
       };
     });
 
+  const noteMessage = (message: ChatMessage) => {
+    if (!requireAuth() || !user) return;
+    if (!message.content.trim() || message.role === "system") return;
+    addNote({
+      userId: user.id,
+      text: message.content,
+      source: `${title} chat`,
+      personaId: philosopherId,
+    });
+    setNotedIds((prev) => new Set(prev).add(message.id));
+    onOpenNotes?.();
+  };
+
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
+    if (!requireAuth() || !user) return;
     const text = input.trim();
     if (!text || streaming) return;
 
@@ -141,6 +190,26 @@ export function ChatPanel({ philosopherId }: Props) {
     }
   };
 
+  if (!user) {
+    return (
+      <section className="chat-panel chat-locked" aria-label={`${title} chat locked`}>
+        <header className="chat-header">
+          <Lock size={15} />
+          <div>
+            <strong>Ask {title}</strong>
+            <small>Sign in required</small>
+          </div>
+        </header>
+        <div className="chat-lock-body">
+          <p>Sign in to chat with {title} and save answers to Notes.</p>
+          <button type="button" onClick={() => requireAuth()}>
+            Sign in to chat
+          </button>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section className="chat-panel" aria-label={`${title} chat`}>
       <header className="chat-header">
@@ -155,7 +224,18 @@ export function ChatPanel({ philosopherId }: Props) {
       <div className="chat-messages">
         {messages.map((message) => (
           <div key={message.id} className={`chat-bubble ${message.role}`}>
-            {message.content}
+            <p>{message.content}</p>
+            {message.role !== "system" && message.content.trim() && (
+              <button
+                type="button"
+                className={`note-it ${notedIds.has(message.id) ? "saved" : ""}`}
+                onClick={() => noteMessage(message)}
+                disabled={streaming && message.id === assistantIdRef.current}
+              >
+                <NotebookPen size={12} />
+                {notedIds.has(message.id) ? "Noted" : "Note it"}
+              </button>
+            )}
           </div>
         ))}
         {streaming && <div className="chat-typing">Thinking…</div>}

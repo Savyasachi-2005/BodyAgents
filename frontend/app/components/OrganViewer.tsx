@@ -68,7 +68,13 @@ export function OrganViewer({ organ, autoRotate, onAutoRotate, compare, onCompar
       viewerRef.current = viewer;
       viewer.setAutoRotate(autoRotateRef.current);
       const current = organRef.current;
-      viewer.setOrgan(current.model, current.hotspots, current.accent).catch(() => {
+      const align = {
+        rotation: current.modelRotation,
+        baseColor: current.id === "bones" ? "#e4d6c2" : undefined,
+        pivotRotation: current.id === "bones" ? ([0, -0.35, 0] as [number, number, number]) : undefined,
+      };
+      viewer.setOrgan(current.model, current.hotspots, current.accent, align).catch((error) => {
+        console.error("Failed to load organ model", current.model, error);
         setLoading(false);
         setProgress(0);
       });
@@ -82,7 +88,13 @@ export function OrganViewer({ organ, autoRotate, onAutoRotate, compare, onCompar
   }, []);
 
   useEffect(() => {
-    viewerRef.current?.setOrgan(organ.model, organ.hotspots, organ.accent).catch(() => {
+    const align = {
+      rotation: organ.modelRotation,
+      baseColor: organ.id === "bones" ? "#e4d6c2" : undefined,
+      pivotRotation: organ.id === "bones" ? ([0, -0.35, 0] as [number, number, number]) : undefined,
+    };
+    viewerRef.current?.setOrgan(organ.model, organ.hotspots, organ.accent, align).catch((error) => {
+      console.error("Failed to load organ model", organ.model, error);
       setLoading(false);
       setProgress(0);
     });

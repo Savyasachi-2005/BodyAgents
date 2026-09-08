@@ -43,13 +43,23 @@ def _build_system_prompt(persona: dict[str, Any], retrieved: list[dict[str, Any]
         f"Vocabulary: {persona.get('vocabulary_level', '')}. "
         f"Domain: {persona.get('domain', '')}."
     )
+    memory_rules = (
+        "You have short-term memory for THIS chat session. "
+        "Prior user and assistant messages are included in the conversation. "
+        "When the learner asks if you remember something from earlier in this chat, "
+        "use those prior messages and answer specifically. "
+        "Never say you have no memory of this conversation."
+    )
     if not retrieved:
-        return f"{base}\n{style}\nUse only reliable educational knowledge. Prefer short answers."
+        return (
+            f"{base}\n{style}\n{memory_rules}\n"
+            "Use only reliable educational knowledge. Prefer short answers."
+        )
 
     context_blocks = [f"[{index}] {passage['text']}" for index, passage in enumerate(retrieved, start=1)]
     context = "\n".join(context_blocks)
     return (
-        f"{base}\n{style}\n"
+        f"{base}\n{style}\n{memory_rules}\n"
         "Ground your answer in the retrieved educational context when relevant. "
         "If the context does not contain the answer, say what you know carefully without inventing facts.\n"
         f"Retrieved context:\n{context}"

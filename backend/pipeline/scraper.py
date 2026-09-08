@@ -10,6 +10,12 @@ SOURCE_URLS: dict[str, list[str]] = {
     "heart": [],
     "lungs": [],
     "bones": [],
+    "liver": [],
+    "kidneys": [],
+    "eyeball": [],
+    "intestine": [],
+    "pancreas": [],
+    "skin": [],
     "digestive": [],
 }
 

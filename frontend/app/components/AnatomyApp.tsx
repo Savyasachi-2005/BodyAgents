@@ -25,8 +25,10 @@ import {
 import { OrganViewer } from "./OrganViewer";
 import { ChatPanel } from "./ChatPanel";
 import { AuthMenu } from "./AuthMenu";
+import { NotesPanel } from "./NotesPanel";
 import { organById, organs, type Organ, type OrganId } from "../lib/anatomy-data";
 import { personaForOrgan } from "../lib/personas";
+import { useAuth } from "../lib/auth-context";
 
 type Modal = "lesson" | "quiz" | "animation" | "system" | null;
 
@@ -70,10 +72,12 @@ function OrganArt({
 }
 
 export function AnatomyApp() {
+  const { requireAuth } = useAuth();
   const [organId, setOrganId] = useState<OrganId>("heart");
   const [autoRotate, setAutoRotate] = useState(true);
   const [compare, setCompare] = useState(false);
   const [modal, setModal] = useState<Modal>(null);
+  const [notesOpen, setNotesOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [mobileLibrary, setMobileLibrary] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -92,6 +96,17 @@ export function AnatomyApp() {
       { opacity: 1, y: 0, duration: 0.48, stagger: 0.035, ease: "power2.out", overwrite: true },
     );
   }, [organId]);
+
+  useEffect(() => {
+    const onLogout = () => setNotesOpen(false);
+    window.addEventListener("bodyagents:auth-logout", onLogout);
+    return () => window.removeEventListener("bodyagents:auth-logout", onLogout);
+  }, []);
+
+  const openNotes = () => {
+    if (!requireAuth()) return;
+    setNotesOpen(true);
+  };
 
   const selectOrgan = (id: OrganId) => {
     if (organById[id].illustrated) {
@@ -125,7 +140,9 @@ export function AnatomyApp() {
           <button><BrainCircuit size={17} /> Systems</button>
           <button onClick={() => setModal("lesson")}><BookOpen size={17} /> Lessons</button>
           <button><LibraryBig size={17} /> Library</button>
-          <button><NotebookPen size={17} /> Notes</button>
+          <button className={notesOpen ? "active" : ""} onClick={openNotes}>
+            <NotebookPen size={17} /> Notes
+          </button>
         </nav>
         <label className="search-box">
           <Search size={17} />
@@ -204,11 +221,12 @@ export function AnatomyApp() {
             <button onClick={() => setModal("quiz")}><CircleHelp size={15} /> Quiz</button>
             <button onClick={() => setCompare(!compare)} className={compare ? "active" : ""}><Share2 size={15} /> Compare</button>
           </div>
-          {personaForOrgan(organId) && (
-            <div data-reveal>
-              <ChatPanel philosopherId={personaForOrgan(organId)!} />
-            </div>
-          )}
+          <div data-reveal>
+            <ChatPanel
+              philosopherId={personaForOrgan(organId)}
+              onOpenNotes={openNotes}
+            />
+          </div>
         </aside>
       </div>
 
@@ -272,6 +290,7 @@ export function AnatomyApp() {
       </section>
 
       {modal && <LearningModal type={modal} organ={organ} onClose={() => setModal(null)} />}
+      <NotesPanel open={notesOpen} onClose={() => setNotesOpen(false)} />
       {mobileLibrary && <button className="drawer-backdrop" aria-label="Close library" onClick={() => setMobileLibrary(false)} />}
     </main>
   );

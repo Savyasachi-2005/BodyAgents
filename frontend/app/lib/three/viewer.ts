@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import gsap from "gsap";
 import type { Hotspot } from "../anatomy-data";
-import { AnatomyAssetManager, type LoadedOrgan } from "./loaders";
+import { AnatomyAssetManager, type LoadedOrgan, type ModelAlign } from "./loaders";
 import { HotspotLayer } from "./hotspots";
 
 type ViewerCallbacks = {
@@ -108,6 +108,10 @@ export class AnatomyViewer {
     this.controls.enablePan = false;
     this.controls.minDistance = 4.8;
     this.controls.maxDistance = 12;
+    // Keep the camera above the horizon so the plinth reads as a floor and does
+    // not tip edge-on when the user drags to orbit the specimen.
+    this.controls.minPolarAngle = 0.28;
+    this.controls.maxPolarAngle = Math.PI / 2 - 0.06;
     this.controls.autoRotate = true;
     this.controls.autoRotateSpeed = 0.65;
     this.controls.target.set(HOME_TARGET.x, HOME_TARGET.y, HOME_TARGET.z);
@@ -239,7 +243,7 @@ export class AnatomyViewer {
     this.assets.prefetch(url);
   }
 
-  async setOrgan(modelUrl: string, hotspots: Hotspot[], accent: string) {
+  async setOrgan(modelUrl: string, hotspots: Hotspot[], accent: string, align?: ModelAlign) {
     const request = ++this.loadRequest;
     this.select(null);
     this.callbacks.onLoading(true, 0);
@@ -270,7 +274,7 @@ export class AnatomyViewer {
     try {
       organ = await this.assets.load(modelUrl, (progress) => {
         if (request === this.loadRequest) this.callbacks.onLoading(true, progress);
-      });
+      }, align);
     } catch (error) {
       if (request === this.loadRequest) this.callbacks.onLoading(false, 0);
       throw error;
@@ -537,7 +541,10 @@ export class AnatomyViewer {
     this.select(null);
     this.tween(this.camera.position, { ...HOME_CAMERA, duration: 0.8, ease: "power3.out" });
     this.tween(this.controls.target, { ...HOME_TARGET, duration: 0.8, ease: "power3.out" });
-    if (this.organ) this.tween(this.organ.pivot.rotation, { x: 0.05, y: -0.28, z: 0, duration: 0.8, ease: "power3.out" });
+    if (this.organ) {
+      const [x, y, z] = this.organ.restRotation;
+      this.tween(this.organ.pivot.rotation, { x, y, z, duration: 0.8, ease: "power3.out" });
+    }
   }
 
   zoom(direction: 1 | -1) {

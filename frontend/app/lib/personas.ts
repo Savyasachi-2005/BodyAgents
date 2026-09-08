@@ -1,22 +1,48 @@
 import type { OrganId } from "./anatomy-data";
 
-export type PersonaId = "brain" | "heart" | "lungs" | "bones" | "digestive";
+export type PersonaId =
+  | "brain"
+  | "heart"
+  | "lungs"
+  | "bones"
+  | "liver"
+  | "kidneys"
+  | "eyeball"
+  | "intestine"
+  | "pancreas"
+  | "skin"
+  | "digestive";
 
-export const PERSONA_IDS: PersonaId[] = ["brain", "heart", "lungs", "bones", "digestive"];
+export const PERSONA_IDS: PersonaId[] = [
+  "brain",
+  "heart",
+  "lungs",
+  "bones",
+  "liver",
+  "kidneys",
+  "eyeball",
+  "intestine",
+  "pancreas",
+  "skin",
+  "digestive",
+];
 
-/** Map UI organs to BodyAgents chat personas. */
-export const organToPersona: Partial<Record<OrganId, PersonaId>> = {
+/** Map each organ library entry to its own organ chat persona. */
+export const organToPersona: Record<OrganId, PersonaId> = {
   brain: "brain",
   heart: "heart",
   lungs: "lungs",
   bones: "bones",
-  intestine: "digestive",
-  liver: "digestive",
-  pancreas: "digestive",
+  liver: "liver",
+  kidneys: "kidneys",
+  eyeball: "eyeball",
+  intestine: "intestine",
+  pancreas: "pancreas",
+  skin: "skin",
 };
 
-export function personaForOrgan(organId: OrganId): PersonaId | null {
-  return organToPersona[organId] ?? null;
+export function personaForOrgan(organId: OrganId): PersonaId {
+  return organToPersona[organId];
 }
 
 export const personaLabels: Record<PersonaId, string> = {
@@ -24,5 +50,11 @@ export const personaLabels: Record<PersonaId, string> = {
   heart: "Heart",
   lungs: "Lungs",
   bones: "Bones",
+  liver: "Liver",
+  kidneys: "Kidneys",
+  eyeball: "Eye",
+  intestine: "Intestine",
+  pancreas: "Pancreas",
+  skin: "Skin",
   digestive: "Digestive System",
 };
