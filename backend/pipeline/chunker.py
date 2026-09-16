@@ -3,37 +3,50 @@
 from __future__ import annotations
 
 import json
+import hashlib
+import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SEED_DIR = ROOT / "seed" / "body_knowledge"
 OUT_PATH = ROOT / "seed" / "chunks.jsonl"
 
-CHUNK_SIZE = 420
-OVERLAP = 80
+CHUNK_SIZE = 900
 
 
 def chunk_text(text: str, body_part_id: str, source: str) -> list[dict]:
-    cleaned = " ".join(text.split())
+    """Keep paragraphs/sentences intact where possible instead of slicing concepts."""
+    cleaned = text.strip()
+    sections = [part.strip() for part in re.split(r"\n\s*\n+", cleaned) if part.strip()]
     chunks: list[dict] = []
-    start = 0
     index = 0
-    while start < len(cleaned):
-        end = min(start + CHUNK_SIZE, len(cleaned))
-        piece = cleaned[start:end].strip()
-        if piece:
+    for section_number, section in enumerate(sections, start=1):
+        sentences = re.split(r"(?<=[.!?])\s+", " ".join(section.split()))
+        current: list[str] = []
+        for sentence in sentences:
+            if current and len(" ".join(current)) + len(sentence) + 1 > CHUNK_SIZE:
+                piece = " ".join(current)
+                chunks.append(
+                    {"body_part_id": body_part_id, "chunk_id": f"{body_part_id}-{index}", "text": piece,
+                     "source": source, "section": f"section-{section_number}",
+                     "content_hash": hashlib.sha256(piece.encode("utf-8")).hexdigest()}
+                )
+                index += 1
+                current = []
+            current.append(sentence)
+        if current:
+            piece = " ".join(current)
             chunks.append(
                 {
                     "body_part_id": body_part_id,
                     "chunk_id": f"{body_part_id}-{index}",
                     "text": piece,
                     "source": source,
+                    "section": f"section-{section_number}",
+                    "content_hash": hashlib.sha256(piece.encode("utf-8")).hexdigest(),
                 }
             )
             index += 1
-        if end >= len(cleaned):
-            break
-        start = max(0, end - OVERLAP)
     return chunks
 
 

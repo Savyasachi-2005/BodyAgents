@@ -12,7 +12,8 @@ def _collection():
     return get_db()[settings.mongodb_sessions_collection]
 
 
-async def get_history(philosopher_id: str, session_id: str, limit: int = 12) -> list[dict[str, str]]:
+async def get_history(philosopher_id: str, session_id: str, limit: int | None = None) -> list[dict[str, str]]:
+    limit = limit or get_settings().session_history_limit
     doc = await _collection().find_one({"philosopher_id": philosopher_id, "session_id": session_id})
     if not doc:
         return []
@@ -35,7 +36,8 @@ async def append_turn(
                     "$each": [
                         {"role": "user", "content": user_message},
                         {"role": "assistant", "content": assistant_message},
-                    ]
+                    ],
+                    "$slice": -get_settings().session_max_messages,
                 }
             },
             "$set": {"updated_at": now},

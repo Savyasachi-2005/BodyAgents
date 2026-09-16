@@ -29,3 +29,21 @@ async def close_client() -> None:
     if _client is not None:
         _client.close()
         _client = None
+
+
+async def ensure_indexes() -> None:
+    """Create only the indexes used by application query paths."""
+    from pymongo import ASCENDING
+
+    settings = get_settings()
+    db = get_db()
+    await db["users"].create_index([("email", ASCENDING)], unique=True, name="users_email_unique")
+    await db["auth_sessions"].create_index([("token", ASCENDING)], unique=True, name="auth_token_unique")
+    await db["auth_sessions"].create_index("expires_at", expireAfterSeconds=0, name="auth_expiry_ttl")
+    await db[settings.mongodb_sessions_collection].create_index(
+        [("philosopher_id", ASCENDING), ("session_id", ASCENDING)],
+        unique=True,
+        name="chat_session_lookup",
+    )
+    await db[settings.mongodb_vector_collection].create_index("body_part_id", name="knowledge_body_part")
+    await db[settings.mongodb_vector_collection].create_index("chunk_id", unique=True, name="knowledge_chunk_unique")
