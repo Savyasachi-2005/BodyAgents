@@ -58,6 +58,14 @@ function getSpeechRecognitionConstructor(): (new () => ISpeechRecognition) | nul
   return anyWindow.SpeechRecognition || anyWindow.webkitSpeechRecognition || null;
 }
 
+export function cleanChatText(text: string): string {
+  if (!text) return "";
+  return text
+    .replace(/(^|\r?\n)(\s*(?:[-*•]\s+)?)\*\*\s*/g, "$1$2")
+    .replace(/\s*\*\*\s+/g, " ")
+    .replace(/\*\*/g, "");
+}
+
 function wsBaseUrl(): string {
   return process.env.NEXT_PUBLIC_WS_URL ?? "ws://localhost:8000";
 }
@@ -199,6 +207,16 @@ export function ChatPanel({ philosopherId, onOpenNotes }: Props) {
             const parsed = JSON.parse(raw) as { type?: string; message?: string };
             if (parsed.type === "done") {
               setStreaming(false);
+              const finishedId = assistantIdRef.current;
+              if (finishedId) {
+                setMessages((prev) =>
+                  prev.map((msg) =>
+                    msg.id === finishedId
+                      ? { ...msg, content: cleanChatText(msg.content) }
+                      : msg,
+                  ),
+                );
+              }
               assistantIdRef.current = null;
               setActiveAssistantId(null);
               return;
@@ -235,10 +253,11 @@ export function ChatPanel({ philosopherId, onOpenNotes }: Props) {
 
   const noteMessage = (message: ChatMessage) => {
     if (!requireAuth() || !user) return;
-    if (!message.content.trim() || message.role === "system") return;
+    const textToSave = cleanChatText(message.content).trim();
+    if (!textToSave || message.role === "system") return;
     addNote({
       userId: user.id,
-      text: message.content,
+      text: textToSave,
       source: `${title} chat`,
       personaId: philosopherId,
     });
@@ -365,7 +384,7 @@ export function ChatPanel({ philosopherId, onOpenNotes }: Props) {
       <div className="chat-messages">
         {messages.map((message) => (
           <div key={message.id} className={`chat-bubble ${message.role}`}>
-            <p>{message.content}</p>
+            <p>{cleanChatText(message.content)}</p>
             {message.role !== "system" && message.content.trim() && (
               <button
                 type="button"

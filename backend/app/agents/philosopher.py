@@ -4,6 +4,7 @@ import json
 import logging
 from collections.abc import AsyncIterator
 from functools import lru_cache
+import re
 from typing import Any, Literal, TypedDict
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
@@ -41,6 +42,14 @@ def _maybe_trace(name: str, metadata: dict[str, Any]) -> None:
         return
 
 
+def clean_chat_text(text: str) -> str:
+    if not text:
+        return ""
+    text = re.sub(r"(^|\r?\n)(\s*(?:[-*•]\s+)?)\*\*\s*", r"\1\2", text)
+    text = re.sub(r"\s*\*\*\s+", " ", text)
+    return text.replace("**", "")
+
+
 def _build_system_prompt(persona: dict[str, Any], retrieved: list[dict[str, Any]]) -> str:
     base = persona["system_prompt"]
     style = (
@@ -55,16 +64,21 @@ def _build_system_prompt(persona: dict[str, Any], retrieved: list[dict[str, Any]
         "use those prior messages and answer specifically. "
         "Never say you have no memory of this conversation."
     )
+    formatting_rules = (
+        "Formatting rules: Do NOT use double asterisks (**) or markdown bold in your output. "
+        "Never start headers, bullet items, or sentences with '** ' or '**'. "
+        "Write clean, plain conversational text without asterisk formatting."
+    )
     if not retrieved:
         return (
-            f"{base}\n{style}\n{memory_rules}\n"
+            f"{base}\n{style}\n{memory_rules}\n{formatting_rules}\n"
             "Use only reliable educational knowledge. Prefer short answers."
         )
 
     context_blocks = [f"[{index}] {passage['text']} (source: {passage.get('source', 'seed')})" for index, passage in enumerate(retrieved, start=1)]
     context = "\n".join(context_blocks)
     return (
-        f"{base}\n{style}\n{memory_rules}\n"
+        f"{base}\n{style}\n{memory_rules}\n{formatting_rules}\n"
         "Ground factual claims in the retrieved context. Cite supporting passages as [1], [2] when used. "
         "If the context is insufficient, explicitly say so instead of inventing anatomy facts.\n"
         f"Retrieved context:\n{context}"
@@ -73,7 +87,11 @@ def _build_system_prompt(persona: dict[str, Any], retrieved: list[dict[str, Any]
 
 async def load_memory_node(state: AgentState) -> AgentState:
     history = await get_history(state["philosopher_id"], state["session_id"])
-    return {"history": history}
+    cleaned_history = [
+        {"role": turn.get("role", "assistant"), "content": clean_chat_text(turn.get("content", ""))}
+        for turn in history
+    ]
+    return {"history": cleaned_history}
 
 
 async def classify_intent_node(state: AgentState) -> AgentState:
@@ -189,7 +207,7 @@ async def stream_reply(
         full_reply.append(text)
         yield text
 
-    assistant_message = "".join(full_reply).strip()
+    assistant_message = clean_chat_text("".join(full_reply).strip())
     if assistant_message:
         await append_turn(philosopher_id, session_id, user_message, assistant_message)
 
