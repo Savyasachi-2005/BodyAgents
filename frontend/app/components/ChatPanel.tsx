@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import { Lock, MessageCircle, NotebookPen, Send, Sparkles } from "lucide-react";
+import { Lock, MessageCircle, Mic, MicOff, NotebookPen, Send, Sparkles } from "lucide-react";
 import { useAuth } from "../lib/auth-context";
 import { personaLabels, type PersonaId } from "../lib/personas";
 import { addNote } from "../lib/notes";
@@ -16,6 +16,47 @@ type Props = {
   philosopherId: PersonaId;
   onOpenNotes?: () => void;
 };
+
+interface ISpeechRecognitionEvent {
+  resultIndex: number;
+  results: {
+    [index: number]: {
+      [index: number]: {
+        transcript: string;
+      };
+      isFinal: boolean;
+      length: number;
+    };
+    length: number;
+  };
+}
+
+interface ISpeechRecognitionErrorEvent {
+  error: string;
+  message?: string;
+}
+
+interface ISpeechRecognition extends EventTarget {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  start(): void;
+  stop(): void;
+  abort(): void;
+  onstart: (() => void) | null;
+  onresult: ((event: ISpeechRecognitionEvent) => void) | null;
+  onerror: ((event: ISpeechRecognitionErrorEvent) => void) | null;
+  onend: (() => void) | null;
+}
+
+function getSpeechRecognitionConstructor(): (new () => ISpeechRecognition) | null {
+  if (typeof window === "undefined") return null;
+  const anyWindow = window as unknown as {
+    SpeechRecognition?: new () => ISpeechRecognition;
+    webkitSpeechRecognition?: new () => ISpeechRecognition;
+  };
+  return anyWindow.SpeechRecognition || anyWindow.webkitSpeechRecognition || null;
+}
 
 function wsBaseUrl(): string {
   return process.env.NEXT_PUBLIC_WS_URL ?? "ws://localhost:8000";
@@ -35,25 +76,35 @@ function getOrCreateSessionId(philosopherId: PersonaId, userId: string): string 
 
 export function ChatPanel({ philosopherId, onOpenNotes }: Props) {
   const { user, requireAuth } = useAuth();
+  const title = useMemo(() => personaLabels[philosopherId], [philosopherId]);
+
   const [input, setInput] = useState("");
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>(() => [
+    {
+      id: "welcome",
+      role: "system",
+      content: user
+        ? `Hi! I'm ${personaLabels[philosopherId]}. Ask me anything about how I work in the body.`
+        : `Sign in to chat with ${personaLabels[philosopherId]} and save notes from our conversation.`,
+    },
+  ]);
+  const [prevPhilosopherId, setPrevPhilosopherId] = useState(philosopherId);
+  const [prevUser, setPrevUser] = useState(user);
   const [streaming, setStreaming] = useState(false);
+  const [isListening, setIsListening] = useState(false);
   const [status, setStatus] = useState<"idle" | "connecting" | "open" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
   const [notedIds, setNotedIds] = useState<Set<string>>(new Set());
+  const [activeAssistantId, setActiveAssistantId] = useState<string | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
+  const recognitionRef = useRef<ISpeechRecognition | null>(null);
+  const baseTextRef = useRef<string>("");
   const assistantIdRef = useRef<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  const title = useMemo(() => personaLabels[philosopherId], [philosopherId]);
-
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, streaming]);
-
-  useEffect(() => {
-    socketRef.current?.close();
-    socketRef.current = null;
+  if (philosopherId !== prevPhilosopherId || user !== prevUser) {
+    setPrevPhilosopherId(philosopherId);
+    setPrevUser(user);
     setMessages([
       {
         id: "welcome",
@@ -67,16 +118,38 @@ export function ChatPanel({ philosopherId, onOpenNotes }: Props) {
     setError(null);
     setStatus("idle");
     setNotedIds(new Set());
-  }, [philosopherId, title, user]);
+    setActiveAssistantId(null);
+  }
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, streaming]);
+
+  useEffect(() => {
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.abort();
+        recognitionRef.current = null;
+      }
+      socketRef.current?.close();
+      socketRef.current = null;
+    };
+  }, [philosopherId, user]);
 
   useEffect(() => {
     const onLogout = () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.abort();
+        recognitionRef.current = null;
+        setIsListening(false);
+      }
       socketRef.current?.close();
       socketRef.current = null;
       setStreaming(false);
       setStatus("idle");
       setNotedIds(new Set());
       setMessages([]);
+      setActiveAssistantId(null);
     };
     window.addEventListener("bodyagents:auth-logout", onLogout);
     return () => window.removeEventListener("bodyagents:auth-logout", onLogout);
@@ -127,12 +200,14 @@ export function ChatPanel({ philosopherId, onOpenNotes }: Props) {
             if (parsed.type === "done") {
               setStreaming(false);
               assistantIdRef.current = null;
+              setActiveAssistantId(null);
               return;
             }
             if (parsed.type === "error") {
               setStreaming(false);
               setError(parsed.message ?? "Agent error");
               assistantIdRef.current = null;
+              setActiveAssistantId(null);
               return;
             }
           } catch {
@@ -144,6 +219,7 @@ export function ChatPanel({ philosopherId, onOpenNotes }: Props) {
         if (!assistantId) {
           const id = `a-${Date.now()}`;
           assistantIdRef.current = id;
+          setActiveAssistantId(id);
           setMessages((prev) => [...prev, { id, role: "assistant", content: raw }]);
           return;
         }
@@ -170,8 +246,72 @@ export function ChatPanel({ philosopherId, onOpenNotes }: Props) {
     onOpenNotes?.();
   };
 
+  const toggleListening = () => {
+    if (streaming) return;
+
+    if (isListening) {
+      recognitionRef.current?.stop();
+      setIsListening(false);
+      return;
+    }
+
+    const SpeechRecognition = getSpeechRecognitionConstructor();
+    if (!SpeechRecognition) {
+      setError("Voice input is not supported in this browser. Please try Chrome, Edge, or Safari.");
+      return;
+    }
+
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = true;
+      recognition.lang = typeof navigator !== "undefined" && navigator.language ? navigator.language : "en-US";
+
+      baseTextRef.current = input.trim() ? `${input.trim()} ` : "";
+
+      recognition.onstart = () => {
+        setIsListening(true);
+        setError(null);
+      };
+
+      recognition.onresult = (event: ISpeechRecognitionEvent) => {
+        let transcript = "";
+        for (let i = 0; i < event.results.length; i++) {
+          transcript += event.results[i][0].transcript;
+        }
+        setInput(baseTextRef.current + transcript);
+      };
+
+      recognition.onerror = (event: ISpeechRecognitionErrorEvent) => {
+        if (event.error === "not-allowed") {
+          setError("Microphone permission was denied. Please allow microphone access.");
+        } else if (event.error !== "no-speech" && event.error !== "aborted") {
+          setError(`Voice input error: ${event.error}`);
+        }
+        setIsListening(false);
+        recognitionRef.current = null;
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+        recognitionRef.current = null;
+      };
+
+      recognitionRef.current = recognition;
+      recognition.start();
+    } catch {
+      setError("Unable to start microphone. Please check your browser audio settings.");
+      setIsListening(false);
+      recognitionRef.current = null;
+    }
+  };
+
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
+    if (isListening) {
+      recognitionRef.current?.stop();
+      setIsListening(false);
+    }
     if (!requireAuth() || !user) return;
     const text = input.trim();
     if (!text || streaming) return;
@@ -181,6 +321,7 @@ export function ChatPanel({ philosopherId, onOpenNotes }: Props) {
     setMessages((prev) => [...prev, { id: `u-${Date.now()}`, role: "user", content: text }]);
     setStreaming(true);
     assistantIdRef.current = null;
+    setActiveAssistantId(null);
 
     try {
       const socket = await ensureSocket();
@@ -230,7 +371,7 @@ export function ChatPanel({ philosopherId, onOpenNotes }: Props) {
                 type="button"
                 className={`note-it ${notedIds.has(message.id) ? "saved" : ""}`}
                 onClick={() => noteMessage(message)}
-                disabled={streaming && message.id === assistantIdRef.current}
+                disabled={streaming && message.id === activeAssistantId}
               >
                 <NotebookPen size={12} />
                 {notedIds.has(message.id) ? "Noted" : "Note it"}
@@ -248,10 +389,21 @@ export function ChatPanel({ philosopherId, onOpenNotes }: Props) {
         <input
           value={input}
           onChange={(event) => setInput(event.target.value)}
-          placeholder={`Ask ${title} a question…`}
+          placeholder={isListening ? "Listening… speak now" : `Ask ${title} a question…`}
           disabled={streaming}
+          className={isListening ? "is-listening" : ""}
           aria-label="Chat message"
         />
+        <button
+          type="button"
+          className={`chat-mic-btn ${isListening ? "listening" : ""}`}
+          onClick={toggleListening}
+          disabled={streaming}
+          aria-label={isListening ? "Stop voice input" : "Voice input"}
+          title={isListening ? "Stop listening" : "Voice input"}
+        >
+          {isListening ? <MicOff size={15} /> : <Mic size={15} />}
+        </button>
         <button type="submit" disabled={streaming || !input.trim()} aria-label="Send message">
           <Send size={15} />
         </button>
