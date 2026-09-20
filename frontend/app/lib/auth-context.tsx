@@ -31,7 +31,7 @@ type AuthContextValue = {
 const TOKEN_KEY = "bodyagents_token";
 
 export function apiBase(): string {
-  return process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8001";
+  return process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);

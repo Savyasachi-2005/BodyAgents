@@ -164,7 +164,7 @@ export class AnatomyAssetManager {
         material.opacity = 1;
         material.depthWrite = true;
         material.depthTest = true;
-        material.side = THREE.FrontSide;
+        material.side = THREE.DoubleSide;
         if (material instanceof THREE.MeshStandardMaterial) {
           if (fallbackColor && !material.map) material.color.copy(fallbackColor);
           // A tighter specular lobe sparkles on any surface with normal detail;
@@ -229,6 +229,7 @@ export class AnatomyAssetManager {
         material.depthWrite = true;
         material.clippingPlanes = null;
         material.clipShadows = false;
+        material.side = THREE.DoubleSide;
         if (material instanceof THREE.MeshStandardMaterial) material.wireframe = false;
         material.needsUpdate = true;
       });
