@@ -101,6 +101,7 @@ export class HotspotLayer {
   private time = 0;
   private selectedAt = -PULSE_SECONDS;
   private lastSelectedId: string | null = null;
+  private clippingPlanes: THREE.Plane[] | null = null;
 
   private readonly world = new THREE.Vector3();
   private readonly toCamera = new THREE.Vector3();
@@ -119,6 +120,16 @@ export class HotspotLayer {
     return this.markers;
   }
 
+  setClippingPlanes(planes: THREE.Plane[] | null) {
+    this.clippingPlanes = planes;
+    this.markers.forEach(({ dot, pulse }) => {
+      dot.material.clippingPlanes = planes;
+      dot.material.needsUpdate = true;
+      pulse.material.clippingPlanes = planes;
+      pulse.material.needsUpdate = true;
+    });
+  }
+
   attach(pivot: THREE.Group, hotspots: Hotspot[], meshes: THREE.Mesh[]) {
     this.clear();
     if (!hotspots.length) return;
@@ -133,6 +144,7 @@ export class HotspotLayer {
           depthTest: true,
           sizeAttenuation: false,
           toneMapped: false,
+          clippingPlanes: this.clippingPlanes,
           // Bias the billboard towards the camera so it is not nibbled by the
           // surface it is sitting on.
           polygonOffset: true,
@@ -153,6 +165,7 @@ export class HotspotLayer {
           depthTest: true,
           sizeAttenuation: false,
           toneMapped: false,
+          clippingPlanes: this.clippingPlanes,
         }),
       );
       pulse.position.copy(anchors[index]);
@@ -217,7 +230,12 @@ export class HotspotLayer {
       const radius = this.outward.length();
       this.toCamera.copy(camera.position).sub(this.world).normalize();
       const facing = radius > 1e-4 ? this.outward.divideScalar(radius).dot(this.toCamera) : 1;
-      const target = THREE.MathUtils.smoothstep(facing, -0.05, 0.3);
+      let target = THREE.MathUtils.smoothstep(facing, -0.05, 0.3);
+      if (this.clippingPlanes && this.clippingPlanes.length) {
+        if (this.clippingPlanes.some((plane) => plane.distanceToPoint(this.world) < 0)) {
+          target = 0;
+        }
+      }
 
       const active = marker.hotspot.id === selectedId || marker.hotspot.id === hoveredId;
       const emphasisTarget = active ? 1 : 0;

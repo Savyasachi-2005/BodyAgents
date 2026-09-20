@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import json
+import logging
 from collections.abc import AsyncIterator
-from typing import Any, TypedDict
+from functools import lru_cache
+from typing import Any, Literal, TypedDict
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_groq import ChatGroq
@@ -13,6 +15,8 @@ from app.memory.sessions import append_turn, get_history
 from app.personas import get_persona
 from app.rag.retrieve import retrieve_passages
 
+logger = logging.getLogger(__name__)
+
 
 class AgentState(TypedDict, total=False):
     philosopher_id: str
@@ -21,6 +25,7 @@ class AgentState(TypedDict, total=False):
     history: list[dict[str, str]]
     retrieved: list[dict[str, Any]]
     system_prompt: str
+    intent: Literal["anatomy", "quiz", "conversation", "visualization"]
 
 
 def _maybe_trace(name: str, metadata: dict[str, Any]) -> None:
@@ -56,12 +61,12 @@ def _build_system_prompt(persona: dict[str, Any], retrieved: list[dict[str, Any]
             "Use only reliable educational knowledge. Prefer short answers."
         )
 
-    context_blocks = [f"[{index}] {passage['text']}" for index, passage in enumerate(retrieved, start=1)]
+    context_blocks = [f"[{index}] {passage['text']} (source: {passage.get('source', 'seed')})" for index, passage in enumerate(retrieved, start=1)]
     context = "\n".join(context_blocks)
     return (
         f"{base}\n{style}\n{memory_rules}\n"
-        "Ground your answer in the retrieved educational context when relevant. "
-        "If the context does not contain the answer, say what you know carefully without inventing facts.\n"
+        "Ground factual claims in the retrieved context. Cite supporting passages as [1], [2] when used. "
+        "If the context is insufficient, explicitly say so instead of inventing anatomy facts.\n"
         f"Retrieved context:\n{context}"
     )
 
@@ -71,12 +76,31 @@ async def load_memory_node(state: AgentState) -> AgentState:
     return {"history": history}
 
 
+async def classify_intent_node(state: AgentState) -> AgentState:
+    message = state["user_message"].lower()
+    if any(word in message for word in ("quiz", "test me", "questionnaire")):
+        intent = "quiz"
+    elif any(word in message for word in ("show", "visual", "model", "rotate", "3d")):
+        intent = "visualization"
+    elif len(message.split()) < 5 and any(word in message for word in ("again", "that", "it", "why")):
+        intent = "conversation"
+    else:
+        intent = "anatomy"
+    return {"intent": intent}
+
+
 async def retrieve_node(state: AgentState) -> AgentState:
     try:
         retrieved = await retrieve_passages(state["philosopher_id"], state["user_message"])
     except Exception:
+        logger.exception("RAG retrieval failed", extra={"persona": state["philosopher_id"]})
         retrieved = []
     return {"retrieved": retrieved}
+
+
+def route_after_intent(state: AgentState) -> str:
+    # Brief conversational follow-ups primarily depend on bounded session memory.
+    return "prompt" if state.get("intent") == "conversation" else "retrieve"
 
 
 async def prompt_node(state: AgentState) -> AgentState:
@@ -88,16 +112,26 @@ async def prompt_node(state: AgentState) -> AgentState:
 def build_agent_graph():
     graph = StateGraph(AgentState)
     graph.add_node("load_memory", load_memory_node)
+    graph.add_node("classify_intent", classify_intent_node)
     graph.add_node("retrieve", retrieve_node)
     graph.add_node("prompt", prompt_node)
     graph.add_edge(START, "load_memory")
-    graph.add_edge("load_memory", "retrieve")
+    graph.add_edge("load_memory", "classify_intent")
+    graph.add_conditional_edges("classify_intent", route_after_intent, {"retrieve": "retrieve", "prompt": "prompt"})
     graph.add_edge("retrieve", "prompt")
     graph.add_edge("prompt", END)
     return graph.compile()
 
 
 _agent = build_agent_graph()
+
+
+@lru_cache
+def get_llm() -> ChatGroq:
+    settings = get_settings()
+    return ChatGroq(api_key=settings.groq_api_key, model=settings.groq_model, temperature=settings.groq_temperature,
+                    max_tokens=settings.groq_max_tokens, timeout=settings.groq_timeout_seconds,
+                    max_retries=settings.groq_max_retries, streaming=True)
 
 
 async def stream_reply(
@@ -131,12 +165,7 @@ async def stream_reply(
             messages.append(AIMessage(content=turn["content"]))
     messages.append(HumanMessage(content=user_message))
 
-    llm = ChatGroq(
-        api_key=settings.groq_api_key,
-        model=settings.groq_model,
-        temperature=0.4,
-        streaming=True,
-    )
+    llm = get_llm()
 
     _maybe_trace(
         "bodyagents_chat",

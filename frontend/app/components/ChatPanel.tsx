@@ -18,7 +18,7 @@ type Props = {
 };
 
 function wsBaseUrl(): string {
-  return process.env.NEXT_PUBLIC_WS_URL ?? "ws://localhost:8001";
+  return process.env.NEXT_PUBLIC_WS_URL ?? "ws://localhost:8000";
 }
 
 function getOrCreateSessionId(philosopherId: PersonaId, userId: string): string {

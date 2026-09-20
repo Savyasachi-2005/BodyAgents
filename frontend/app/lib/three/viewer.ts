@@ -37,7 +37,7 @@ export class AnatomyViewer {
   private clock = new THREE.Clock();
   private resizeObserver: ResizeObserver;
   private intersectionObserver: IntersectionObserver;
-  private clipPlane = new THREE.Plane(new THREE.Vector3(-1, 0, 0), 0);
+  private clipPlane = new THREE.Plane(new THREE.Vector3(-0.85, 0, -0.45).normalize(), 2.8);
   /** Writes depth only — used to resolve a fading organ to one surface. */
   private depthMaterial = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: true, depthTest: true });
   private crossSection = false;
@@ -290,7 +290,10 @@ export class AnatomyViewer {
     // Anchor the dots while the organ is still invisible, then play the intro.
     this.hotspots.attach(organ.pivot, hotspots, organ.meshes);
     this.hotspots.setPixelSize(DOT_PIXELS, this.height, CAMERA_FOV);
-    if (this.crossSection) this.applyClipping(true);
+    if (this.crossSection) {
+      this.clipPlane.constant = 0.05;
+      this.applyClipping(true);
+    }
 
     const glow = this.scene.getObjectByName("organ-glow") as THREE.PointLight | undefined;
     glow?.color.set(accent);
@@ -539,6 +542,18 @@ export class AnatomyViewer {
 
   reset() {
     this.select(null);
+    if (this.crossSection) {
+      this.crossSection = false;
+      gsap.killTweensOf(this.clipPlane);
+      this.clipPlane.constant = 2.8;
+      this.applyClipping(false);
+    }
+    if (this.isolated) {
+      this.isolated = false;
+      const plinth = this.plinth.material as THREE.MeshStandardMaterial;
+      this.tween(plinth, { opacity: 1, duration: 0.45 });
+      this.tween(this.contactShadow.material, { opacity: 0.55, duration: 0.45 });
+    }
     this.tween(this.camera.position, { ...HOME_CAMERA, duration: 0.8, ease: "power3.out" });
     this.tween(this.controls.target, { ...HOME_TARGET, duration: 0.8, ease: "power3.out" });
     if (this.organ) {
@@ -566,17 +581,27 @@ export class AnatomyViewer {
 
   toggleCrossSection() {
     this.crossSection = !this.crossSection;
-    this.applyClipping(this.crossSection);
-    gsap.fromTo(
-      this.clipPlane,
-      { constant: -1.8 },
-      {
-        constant: this.crossSection ? 0 : -1.8,
+    gsap.killTweensOf(this.clipPlane);
+    if (this.crossSection) {
+      this.applyClipping(true);
+      this.clipPlane.constant = 2.8;
+      this.tween(this.clipPlane, {
+        constant: 0.05,
         duration: 0.85,
-        ease: "power2.inOut",
-        onUpdate: () => (this.dirty = true),
-      },
-    );
+        ease: "power2.out",
+      });
+    } else {
+      this.tween(this.clipPlane, {
+        constant: 2.8,
+        duration: 0.7,
+        ease: "power2.in",
+        onComplete: () => {
+          if (!this.crossSection) {
+            this.applyClipping(false);
+          }
+        },
+      });
+    }
     this.busy(0.95);
     return this.crossSection;
   }
@@ -586,8 +611,11 @@ export class AnatomyViewer {
     const planes = enabled ? [this.clipPlane] : null;
     [...this.materials(this.organ), this.depthMaterial].forEach((material) => {
       material.clippingPlanes = planes;
+      material.side = enabled ? THREE.DoubleSide : THREE.FrontSide;
+      material.clipShadows = true;
       material.needsUpdate = true;
     });
+    this.hotspots.setClippingPlanes(planes);
     this.dirty = true;
   }
 
@@ -609,6 +637,7 @@ export class AnatomyViewer {
     this.loadRequest += 1;
     cancelAnimationFrame(this.frame);
     gsap.killTweensOf(this.camera.position);
+    gsap.killTweensOf(this.clipPlane);
     this.controls.removeEventListener("start", this.onControlStart);
     this.controls.dispose();
     this.resizeObserver.disconnect();

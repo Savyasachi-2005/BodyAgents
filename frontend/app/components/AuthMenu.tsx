@@ -35,7 +35,11 @@ export function AuthMenu() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-      const data = await response.json();
+      const data = (await response.json()) as {
+        detail?: unknown;
+        token?: string;
+        user?: any;
+      };
       if (!response.ok) {
         const detail = data.detail;
         const message =
@@ -45,6 +49,9 @@ export function AuthMenu() {
               ? detail.map((item: { msg?: string }) => item.msg).filter(Boolean).join(", ")
               : "Authentication failed";
         throw new Error(message);
+      }
+      if (!data.token) {
+        throw new Error("Authentication failed: missing session token");
       }
       setSession(data.token, data.user);
       setPassword("");

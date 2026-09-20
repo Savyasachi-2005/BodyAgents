@@ -21,9 +21,21 @@ class Settings(BaseSettings):
     mongodb_db: str = "philoagents"
     mongodb_vector_collection: str = "body_knowledge"
     mongodb_sessions_collection: str = "chat_sessions"
+    mongodb_vector_index: str = "body_knowledge_vector"
 
     embedding_model: str = "all-MiniLM-L6-v2"
     rag_top_k: int = 5
+    rag_num_candidates: int = 100
+    rag_min_score: float = 0.35
+    rag_vector_search_enabled: bool = True
+    rag_fallback_enabled: bool = True
+    session_history_limit: int = 12
+    session_max_messages: int = 80
+    max_websocket_message_chars: int = 4_000
+    groq_temperature: float = 0.4
+    groq_max_tokens: int = 800
+    groq_timeout_seconds: float = 30.0
+    groq_max_retries: int = 2
 
     api_host: str = "0.0.0.0"
     api_port: int = 8000
