@@ -4,13 +4,16 @@ import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { Lock, MessageCircle, Mic, MicOff, NotebookPen, Send, Sparkles } from "lucide-react";
 import { useAuth } from "../lib/auth-context";
 import { personaLabels, type PersonaId } from "../lib/personas";
-import { addNote } from "../lib/notes";
+import { addNote, loadNotes } from "../lib/notes";
+import {
+  clearChatStorage,
+  getOrCreateSessionId,
+  loadStoredMessages,
+  saveStoredMessages,
+  type ChatMessage,
+} from "../lib/chat-storage";
 
-type ChatMessage = {
-  id: string;
-  role: "user" | "assistant" | "system";
-  content: string;
-};
+export type { ChatMessage };
 
 type Props = {
   philosopherId: PersonaId;
@@ -70,32 +73,30 @@ function wsBaseUrl(): string {
   return process.env.NEXT_PUBLIC_WS_URL ?? "ws://localhost:8000";
 }
 
-function getOrCreateSessionId(philosopherId: PersonaId, userId: string): string {
-  const key = `bodyagents_chat_session_${userId}_${philosopherId}`;
-  const existing = sessionStorage.getItem(key);
-  if (existing) return existing;
-  const created =
-    typeof crypto !== "undefined" && "randomUUID" in crypto
-      ? crypto.randomUUID()
-      : `session-${Date.now()}`;
-  sessionStorage.setItem(key, created);
-  return created;
+function createWelcomeMessage(philosopherId: PersonaId, hasUser: boolean): ChatMessage {
+  const organTitle = personaLabels[philosopherId] ?? philosopherId;
+  return {
+    id: `welcome-${philosopherId}`,
+    role: "system",
+    content: hasUser
+      ? `Hi! I'm ${organTitle}. Ask me anything about how I work in the body.`
+      : `Sign in to chat with ${organTitle} and save notes from our conversation.`,
+  };
 }
 
 export function ChatPanel({ philosopherId, onOpenNotes }: Props) {
   const { user, requireAuth } = useAuth();
-  const title = useMemo(() => personaLabels[philosopherId], [philosopherId]);
+  const title = useMemo(() => personaLabels[philosopherId] ?? philosopherId, [philosopherId]);
 
   const [input, setInput] = useState("");
-  const [messages, setMessages] = useState<ChatMessage[]>(() => [
-    {
-      id: "welcome",
-      role: "system",
-      content: user
-        ? `Hi! I'm ${personaLabels[philosopherId]}. Ask me anything about how I work in the body.`
-        : `Sign in to chat with ${personaLabels[philosopherId]} and save notes from our conversation.`,
-    },
-  ]);
+  const [messages, setMessages] = useState<ChatMessage[]>(() => {
+    const userId = user?.id ?? "guest";
+    return loadStoredMessages(
+      philosopherId,
+      userId,
+      createWelcomeMessage(philosopherId, Boolean(user)),
+    );
+  });
   const [prevPhilosopherId, setPrevPhilosopherId] = useState(philosopherId);
   const [prevUser, setPrevUser] = useState(user);
   const [streaming, setStreaming] = useState(false);
@@ -104,46 +105,83 @@ export function ChatPanel({ philosopherId, onOpenNotes }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [notedIds, setNotedIds] = useState<Set<string>>(new Set());
   const [activeAssistantId, setActiveAssistantId] = useState<string | null>(null);
+
+  const messagesRef = useRef(messages);
+  messagesRef.current = messages;
+
   const socketRef = useRef<WebSocket | null>(null);
   const recognitionRef = useRef<ISpeechRecognition | null>(null);
   const baseTextRef = useRef<string>("");
   const assistantIdRef = useRef<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
+  // Synchronize messages when philosopher or user changes (if not unmounted)
   if (philosopherId !== prevPhilosopherId || user !== prevUser) {
     setPrevPhilosopherId(philosopherId);
     setPrevUser(user);
-    setMessages([
-      {
-        id: "welcome",
-        role: "system",
-        content: user
-          ? `Hi! I'm ${title}. Ask me anything about how I work in the body.`
-          : `Sign in to chat with ${title} and save notes from our conversation.`,
-      },
-    ]);
+    const userId = user?.id ?? "guest";
+    setMessages(
+      loadStoredMessages(
+        philosopherId,
+        userId,
+        createWelcomeMessage(philosopherId, Boolean(user)),
+      ),
+    );
+    setInput("");
     setStreaming(false);
     setError(null);
     setStatus("idle");
-    setNotedIds(new Set());
     setActiveAssistantId(null);
+    assistantIdRef.current = null;
   }
 
+  // Scroll to bottom when new messages arrive
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, streaming]);
 
+  // Clean up socket, speech recognition, and persist current messages on switch or unmount
   useEffect(() => {
     return () => {
       if (recognitionRef.current) {
         recognitionRef.current.abort();
         recognitionRef.current = null;
       }
-      socketRef.current?.close();
-      socketRef.current = null;
+      if (socketRef.current) {
+        socketRef.current.close();
+        socketRef.current = null;
+      }
+      if (user) {
+        saveStoredMessages(philosopherId, user.id, messagesRef.current);
+      }
     };
   }, [philosopherId, user]);
 
+  // Sync noted IDs with saved notes
+  useEffect(() => {
+    if (!user) {
+      setNotedIds(new Set());
+      return;
+    }
+    const updateNoted = () => {
+      const notes = loadNotes(user.id);
+      const savedTexts = new Set(notes.map((n) => n.text.trim()));
+      const matchingIds = new Set<string>();
+      for (const msg of messages) {
+        const clean = cleanChatText(msg.content).trim();
+        if (clean && savedTexts.has(clean)) {
+          matchingIds.add(msg.id);
+        }
+      }
+      setNotedIds(matchingIds);
+    };
+
+    updateNoted();
+    window.addEventListener("bodyagents:notes-changed", updateNoted);
+    return () => window.removeEventListener("bodyagents:notes-changed", updateNoted);
+  }, [messages, user]);
+
+  // Handle user logout - clean everything
   useEffect(() => {
     const onLogout = () => {
       if (recognitionRef.current) {
@@ -151,17 +189,21 @@ export function ChatPanel({ philosopherId, onOpenNotes }: Props) {
         recognitionRef.current = null;
         setIsListening(false);
       }
-      socketRef.current?.close();
-      socketRef.current = null;
+      if (socketRef.current) {
+        socketRef.current.close();
+        socketRef.current = null;
+      }
       setStreaming(false);
       setStatus("idle");
       setNotedIds(new Set());
-      setMessages([]);
       setActiveAssistantId(null);
+      assistantIdRef.current = null;
+      clearChatStorage();
+      setMessages([createWelcomeMessage(philosopherId, false)]);
     };
     window.addEventListener("bodyagents:auth-logout", onLogout);
     return () => window.removeEventListener("bodyagents:auth-logout", onLogout);
-  }, []);
+  }, [philosopherId]);
 
   const ensureSocket = () =>
     new Promise<WebSocket>((resolve, reject) => {
@@ -209,13 +251,15 @@ export function ChatPanel({ philosopherId, onOpenNotes }: Props) {
               setStreaming(false);
               const finishedId = assistantIdRef.current;
               if (finishedId) {
-                setMessages((prev) =>
-                  prev.map((msg) =>
+                setMessages((prev) => {
+                  const next = prev.map((msg) =>
                     msg.id === finishedId
                       ? { ...msg, content: cleanChatText(msg.content) }
                       : msg,
-                  ),
-                );
+                  );
+                  saveStoredMessages(philosopherId, user.id, next);
+                  return next;
+                });
               }
               assistantIdRef.current = null;
               setActiveAssistantId(null);
@@ -224,6 +268,18 @@ export function ChatPanel({ philosopherId, onOpenNotes }: Props) {
             if (parsed.type === "error") {
               setStreaming(false);
               setError(parsed.message ?? "Agent error");
+              const finishedId = assistantIdRef.current;
+              if (finishedId) {
+                setMessages((prev) => {
+                  const next = prev.map((msg) =>
+                    msg.id === finishedId
+                      ? { ...msg, content: cleanChatText(msg.content) }
+                      : msg,
+                  );
+                  saveStoredMessages(philosopherId, user.id, next);
+                  return next;
+                });
+              }
               assistantIdRef.current = null;
               setActiveAssistantId(null);
               return;
@@ -238,7 +294,11 @@ export function ChatPanel({ philosopherId, onOpenNotes }: Props) {
           const id = `a-${Date.now()}`;
           assistantIdRef.current = id;
           setActiveAssistantId(id);
-          setMessages((prev) => [...prev, { id, role: "assistant", content: raw }]);
+          setMessages((prev) => {
+            const next: ChatMessage[] = [...prev, { id, role: "assistant" as const, content: raw }];
+            saveStoredMessages(philosopherId, user.id, next);
+            return next;
+          });
           return;
         }
         setMessages((prev) =>
@@ -337,7 +397,12 @@ export function ChatPanel({ philosopherId, onOpenNotes }: Props) {
 
     setInput("");
     setError(null);
-    setMessages((prev) => [...prev, { id: `u-${Date.now()}`, role: "user", content: text }]);
+    const userMessage: ChatMessage = { id: `u-${Date.now()}`, role: "user", content: text };
+    setMessages((prev) => {
+      const next = [...prev, userMessage];
+      saveStoredMessages(philosopherId, user.id, next);
+      return next;
+    });
     setStreaming(true);
     assistantIdRef.current = null;
     setActiveAssistantId(null);

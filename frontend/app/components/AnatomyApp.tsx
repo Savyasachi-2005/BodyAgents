@@ -223,6 +223,7 @@ export function AnatomyApp() {
           </div>
           <div data-reveal>
             <ChatPanel
+              key={personaForOrgan(organId)}
               philosopherId={personaForOrgan(organId)}
               onOpenNotes={openNotes}
             />

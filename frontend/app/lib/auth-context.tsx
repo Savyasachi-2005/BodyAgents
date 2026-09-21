@@ -9,6 +9,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { clearChatStorage } from "./chat-storage";
 
 export type AuthUser = {
   id: string;
@@ -88,6 +89,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem(TOKEN_KEY);
     setToken(null);
     setUser(null);
+    clearChatStorage();
     window.dispatchEvent(new CustomEvent("bodyagents:auth-logout"));
   }, []);
 
