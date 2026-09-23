@@ -7,3 +7,6 @@ dist
 .vinext
 outputs
 work
+# Cloudflare Workers runtime files — not needed for Next.js / Vercel build
+worker
+build
