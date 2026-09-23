@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from functools import lru_cache
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-import numpy as np
-from sentence_transformers import SentenceTransformer
+if TYPE_CHECKING:
+    import numpy as np
+    from sentence_transformers import SentenceTransformer
 
 from app.config import get_settings
 from app.memory.db import get_db
@@ -18,18 +19,24 @@ class RetrievalError(RuntimeError):
 
 
 @lru_cache
-def get_embedder() -> SentenceTransformer:
+def get_embedder() -> "SentenceTransformer":
+    from sentence_transformers import SentenceTransformer  # lazy import
+
     settings = get_settings()
     return SentenceTransformer(settings.embedding_model)
 
 
 def embed_texts(texts: list[str]) -> list[list[float]]:
+    import numpy as np  # lazy import
+
     model = get_embedder()
     vectors = model.encode(texts, normalize_embeddings=True)
-    return [vector.tolist() for vector in vectors]
+    return [v.tolist() for v in np.asarray(vectors)]
 
 
-def cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
+def cosine_similarity(a: "np.ndarray", b: "np.ndarray") -> float:
+    import numpy as np  # lazy import
+
     return float(np.dot(a, b))
 
 
@@ -63,8 +70,10 @@ async def _vector_search(collection: Any, philosopher_id: str, query_vector: lis
     return [document async for document in collection.aggregate(pipeline)]
 
 
-async def _explicit_fallback(collection: Any, philosopher_id: str, query_vector: np.ndarray, k: int) -> list[dict[str, Any]]:
+async def _explicit_fallback(collection: Any, philosopher_id: str, query_vector: "np.ndarray", k: int) -> list[dict[str, Any]]:
     """Compatibility path for local MongoDB. It is deliberately logged."""
+    import numpy as np  # lazy import
+
     logger.warning("MongoDB Vector Search unavailable; using bounded Python fallback", extra={"body_part_id": philosopher_id})
     cursor = collection.find({"body_part_id": philosopher_id}, {"text": 1, "embedding": 1, "source": 1, "chunk_id": 1, "section": 1})
     scored: list[dict[str, Any]] = []
@@ -94,5 +103,6 @@ async def retrieve_passages(philosopher_id: str, query: str, top_k: int | None =
         logger.warning("Vector search failed: %s", exc)
     if not settings.rag_fallback_enabled:
         return []
+    import numpy as np  # lazy import
     fallback = await _explicit_fallback(collection, philosopher_id, np.asarray(query_values, dtype=np.float32), k)
     return _normalize_results(fallback, settings.rag_min_score)
