@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { Lock, MessageCircle, Mic, MicOff, NotebookPen, Send, Sparkles } from "lucide-react";
