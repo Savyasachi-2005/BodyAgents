@@ -21,16 +21,92 @@ function wsBaseUrl(): string {
   return process.env.NEXT_PUBLIC_WS_URL ?? "ws://localhost:8000";
 }
 
+/** Strip common Markdown so chat bubbles stay plain text. */
+function toPlainText(text: string): string {
+  return text
+    .replace(/```[\s\S]*?```/g, (block) => block.replace(/```\w*\n?/g, "").replace(/```/g, ""))
+    .replace(/`([^`]+)`/g, "$1")
+    .replace(/^#{1,6}\s+/gm, "")
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .replace(/__([^_]+)__/g, "$1")
+    .replace(/(^|[^\w])\*([^*\n]+)\*(?!\*)/g, "$1$2")
+    .replace(/(^|[^\w])_([^_\n]+)_(?!_)/g, "$1$2")
+    .replace(/^\s*[-*+]\s+/gm, "")
+    .replace(/^\s*\d+\.\s+/gm, "")
+    .replace(/\[(\d+)\]/g, "")
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function sessionKey(userId: string, philosopherId: PersonaId) {
+  return `bodyagents_chat_session_${userId}_${philosopherId}`;
+}
+
+function historyKey(userId: string, philosopherId: PersonaId) {
+  return `bodyagents_chat_history_${userId}_${philosopherId}`;
+}
+
+function welcomeMessage(title: string, signedIn: boolean): ChatMessage {
+  return {
+    id: "welcome",
+    role: "system",
+    content: signedIn
+      ? `Hi! I'm ${title}. Ask me anything about how I work in the body.`
+      : `Sign in to chat with ${title} and save notes from our conversation.`,
+  };
+}
+
 function getOrCreateSessionId(philosopherId: PersonaId, userId: string): string {
-  const key = `bodyagents_chat_session_${userId}_${philosopherId}`;
-  const existing = sessionStorage.getItem(key);
+  const key = sessionKey(userId, philosopherId);
+  const existing = localStorage.getItem(key);
   if (existing) return existing;
   const created =
     typeof crypto !== "undefined" && "randomUUID" in crypto
       ? crypto.randomUUID()
       : `session-${Date.now()}`;
-  sessionStorage.setItem(key, created);
+  localStorage.setItem(key, created);
   return created;
+}
+
+function loadHistory(userId: string, philosopherId: PersonaId, title: string): ChatMessage[] {
+  try {
+    const raw = localStorage.getItem(historyKey(userId, philosopherId));
+    if (!raw) return [welcomeMessage(title, true)];
+    const parsed = JSON.parse(raw) as ChatMessage[];
+    if (!Array.isArray(parsed) || parsed.length === 0) return [welcomeMessage(title, true)];
+    return parsed.filter(
+      (message) =>
+        message &&
+        typeof message.id === "string" &&
+        typeof message.content === "string" &&
+        (message.role === "user" || message.role === "assistant" || message.role === "system"),
+    );
+  } catch {
+    return [welcomeMessage(title, true)];
+  }
+}
+
+function saveHistory(userId: string, philosopherId: PersonaId, messages: ChatMessage[]) {
+  try {
+    localStorage.setItem(historyKey(userId, philosopherId), JSON.stringify(messages));
+  } catch {
+    // Ignore quota / private-mode failures; chat still works for the current view.
+  }
+}
+
+function clearUserChatStorage(userId: string) {
+  const prefixes = [
+    `bodyagents_chat_session_${userId}_`,
+    `bodyagents_chat_history_${userId}_`,
+  ];
+  for (let index = localStorage.length - 1; index >= 0; index -= 1) {
+    const key = localStorage.key(index);
+    if (!key) continue;
+    if (prefixes.some((prefix) => key.startsWith(prefix))) {
+      localStorage.removeItem(key);
+    }
+  }
 }
 
 export function ChatPanel({ philosopherId, onOpenNotes }: Props) {
@@ -44,6 +120,7 @@ export function ChatPanel({ philosopherId, onOpenNotes }: Props) {
   const socketRef = useRef<WebSocket | null>(null);
   const assistantIdRef = useRef<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const hydratedRef = useRef(false);
 
   const title = useMemo(() => personaLabels[philosopherId], [philosopherId]);
 
@@ -54,20 +131,26 @@ export function ChatPanel({ philosopherId, onOpenNotes }: Props) {
   useEffect(() => {
     socketRef.current?.close();
     socketRef.current = null;
-    setMessages([
-      {
-        id: "welcome",
-        role: "system",
-        content: user
-          ? `Hi! I'm ${title}. Ask me anything about how I work in the body.`
-          : `Sign in to chat with ${title} and save notes from our conversation.`,
-      },
-    ]);
     setStreaming(false);
     setError(null);
     setStatus("idle");
     setNotedIds(new Set());
+    assistantIdRef.current = null;
+    hydratedRef.current = false;
+
+    if (!user) {
+      setMessages([welcomeMessage(title, false)]);
+      return;
+    }
+
+    setMessages(loadHistory(user.id, philosopherId, title));
+    hydratedRef.current = true;
   }, [philosopherId, title, user]);
+
+  useEffect(() => {
+    if (!user || !hydratedRef.current || streaming) return;
+    saveHistory(user.id, philosopherId, messages);
+  }, [messages, philosopherId, user, streaming]);
 
   useEffect(() => {
     const onLogout = () => {
@@ -76,11 +159,13 @@ export function ChatPanel({ philosopherId, onOpenNotes }: Props) {
       setStreaming(false);
       setStatus("idle");
       setNotedIds(new Set());
+      if (user) clearUserChatStorage(user.id);
       setMessages([]);
+      hydratedRef.current = false;
     };
     window.addEventListener("bodyagents:auth-logout", onLogout);
     return () => window.removeEventListener("bodyagents:auth-logout", onLogout);
-  }, []);
+  }, [user]);
 
   const ensureSocket = () =>
     new Promise<WebSocket>((resolve, reject) => {
@@ -162,7 +247,7 @@ export function ChatPanel({ philosopherId, onOpenNotes }: Props) {
     if (!message.content.trim() || message.role === "system") return;
     addNote({
       userId: user.id,
-      text: message.content,
+      text: toPlainText(message.content),
       source: `${title} chat`,
       personaId: philosopherId,
     });
@@ -224,7 +309,7 @@ export function ChatPanel({ philosopherId, onOpenNotes }: Props) {
       <div className="chat-messages">
         {messages.map((message) => (
           <div key={message.id} className={`chat-bubble ${message.role}`}>
-            <p>{message.content}</p>
+            <p>{message.role === "assistant" ? toPlainText(message.content) : message.content}</p>
             {message.role !== "system" && message.content.trim() && (
               <button
                 type="button"

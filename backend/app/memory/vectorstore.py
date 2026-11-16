@@ -1,7 +1,10 @@
 from __future__ import annotations
 
-from functools import lru_cache
+import asyncio
 import logging
+import re
+from functools import lru_cache
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -12,6 +15,8 @@ from app.config import get_settings
 from app.memory.db import get_db
 
 logger = logging.getLogger(__name__)
+SEED_DIR = Path(__file__).resolve().parents[2] / "seed" / "body_knowledge"
+_EMBED_TIMEOUT_SECONDS = 12.0
 
 
 class RetrievalError(RuntimeError):
@@ -54,6 +59,45 @@ def _normalize_results(documents: list[dict[str, Any]], min_score: float) -> lis
     ]
 
 
+def _seed_keyword_fallback(philosopher_id: str, query: str, k: int) -> list[dict[str, Any]]:
+    """Fast offline path used when embeddings/Mongo vector search are unavailable."""
+    path = SEED_DIR / f"{philosopher_id}.txt"
+    if not path.exists():
+        return []
+
+    tokens = [token for token in re.findall(r"[a-z0-9]+", query.lower()) if len(token) > 2]
+    paragraphs = [part.strip() for part in path.read_text(encoding="utf-8").split("\n\n") if part.strip()]
+    if not paragraphs:
+        paragraphs = [line.strip() for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+
+    scored: list[dict[str, Any]] = []
+    for index, paragraph in enumerate(paragraphs):
+        haystack = paragraph.lower()
+        hits = sum(1 for token in tokens if token in haystack) if tokens else 1
+        if hits <= 0:
+            continue
+        scored.append(
+            {
+                "text": paragraph,
+                "source": path.name,
+                "chunk_id": f"{philosopher_id}-seed-{index}",
+                "section": None,
+                "score": float(hits),
+            }
+        )
+
+    scored.sort(key=lambda item: item["score"], reverse=True)
+    return scored[:k] or [
+        {
+            "text": paragraphs[0],
+            "source": path.name,
+            "chunk_id": f"{philosopher_id}-seed-0",
+            "section": None,
+            "score": 1.0,
+        }
+    ][:k]
+
+
 async def _vector_search(collection: Any, philosopher_id: str, query_vector: list[float], k: int) -> list[dict[str, Any]]:
     settings = get_settings()
     pipeline = [
@@ -75,7 +119,10 @@ async def _explicit_fallback(collection: Any, philosopher_id: str, query_vector:
     import numpy as np  # lazy import
 
     logger.warning("MongoDB Vector Search unavailable; using bounded Python fallback", extra={"body_part_id": philosopher_id})
-    cursor = collection.find({"body_part_id": philosopher_id}, {"text": 1, "embedding": 1, "source": 1, "chunk_id": 1, "section": 1})
+    cursor = collection.find(
+        {"body_part_id": philosopher_id},
+        {"text": 1, "embedding": 1, "source": 1, "chunk_id": 1, "section": 1},
+    ).limit(250)
     scored: list[dict[str, Any]] = []
     async for doc in cursor:
         embedding = doc.get("embedding")
@@ -88,21 +135,45 @@ async def _explicit_fallback(collection: Any, philosopher_id: str, query_vector:
 async def retrieve_passages(philosopher_id: str, query: str, top_k: int | None = None) -> list[dict[str, Any]]:
     settings = get_settings()
     k = top_k or settings.rag_top_k
-    collection = get_db()[settings.mongodb_vector_collection]
-
     if not query.strip():
         return []
-    query_values = embed_texts([query])[0]
+
+    try:
+        query_values = await asyncio.wait_for(
+            asyncio.to_thread(embed_texts, [query]),
+            timeout=_EMBED_TIMEOUT_SECONDS,
+        )
+        query_values = query_values[0]
+    except Exception as exc:
+        logger.warning("Embedding unavailable (%s); using seed text fallback", exc)
+        return _seed_keyword_fallback(philosopher_id, query, k)
+
+    collection = get_db()[settings.mongodb_vector_collection]
     try:
         if settings.rag_vector_search_enabled:
             results = await _vector_search(collection, philosopher_id, query_values, k)
-            return _normalize_results(results, settings.rag_min_score)
+            normalized = _normalize_results(results, settings.rag_min_score)
+            if normalized:
+                return normalized
     except Exception as exc:
         if not settings.rag_fallback_enabled:
             raise RetrievalError("MongoDB Vector Search failed") from exc
         logger.warning("Vector search failed: %s", exc)
-    if not settings.rag_fallback_enabled:
-        return []
-    import numpy as np  # lazy import
-    fallback = await _explicit_fallback(collection, philosopher_id, np.asarray(query_values, dtype=np.float32), k)
-    return _normalize_results(fallback, settings.rag_min_score)
+
+    if settings.rag_fallback_enabled:
+        try:
+            import numpy as np  # lazy import
+
+            fallback = await _explicit_fallback(
+                collection,
+                philosopher_id,
+                np.asarray(query_values, dtype=np.float32),
+                k,
+            )
+            normalized = _normalize_results(fallback, settings.rag_min_score)
+            if normalized:
+                return normalized
+        except Exception as exc:
+            logger.warning("Python vector fallback failed: %s", exc)
+
+    return _seed_keyword_fallback(philosopher_id, query, k)

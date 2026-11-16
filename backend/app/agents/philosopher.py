@@ -55,24 +55,34 @@ def _build_system_prompt(persona: dict[str, Any], retrieved: list[dict[str, Any]
         "use those prior messages and answer specifically. "
         "Never say you have no memory of this conversation."
     )
+    format_rules = (
+        "Reply in plain text only. "
+        "Do not use Markdown, bold, italics, headings, code fences, tables, or bullet/numbered list markers. "
+        "Do not use citation markers like [1] or [2]. "
+        "Write short clear sentences."
+    )
     if not retrieved:
         return (
-            f"{base}\n{style}\n{memory_rules}\n"
+            f"{base}\n{style}\n{memory_rules}\n{format_rules}\n"
             "Use only reliable educational knowledge. Prefer short answers."
         )
 
     context_blocks = [f"[{index}] {passage['text']} (source: {passage.get('source', 'seed')})" for index, passage in enumerate(retrieved, start=1)]
     context = "\n".join(context_blocks)
     return (
-        f"{base}\n{style}\n{memory_rules}\n"
-        "Ground factual claims in the retrieved context. Cite supporting passages as [1], [2] when used. "
+        f"{base}\n{style}\n{memory_rules}\n{format_rules}\n"
+        "Ground factual claims in the retrieved context without naming citation numbers. "
         "If the context is insufficient, explicitly say so instead of inventing anatomy facts.\n"
         f"Retrieved context:\n{context}"
     )
 
 
 async def load_memory_node(state: AgentState) -> AgentState:
-    history = await get_history(state["philosopher_id"], state["session_id"])
+    try:
+        history = await get_history(state["philosopher_id"], state["session_id"])
+    except Exception:
+        logger.exception("Session memory load failed", extra={"persona": state["philosopher_id"]})
+        history = []
     return {"history": history}
 
 
@@ -177,20 +187,28 @@ async def stream_reply(
     )
 
     full_reply: list[str] = []
-    async for chunk in llm.astream(messages):
-        token = chunk.content
-        if not token:
-            continue
-        if isinstance(token, list):
-            token = "".join(
-                part.get("text", "") if isinstance(part, dict) else str(part) for part in token
-            )
-        text = str(token)
-        full_reply.append(text)
-        yield text
+    try:
+        async for chunk in llm.astream(messages):
+            token = chunk.content
+            if not token:
+                continue
+            if isinstance(token, list):
+                token = "".join(
+                    part.get("text", "") if isinstance(part, dict) else str(part) for part in token
+                )
+            text = str(token)
+            full_reply.append(text)
+            yield text
+    except Exception as exc:
+        logger.exception("Groq streaming failed", extra={"persona": philosopher_id})
+        yield json.dumps({"type": "error", "message": f"Chat model error: {exc}"})
+        return
 
     assistant_message = "".join(full_reply).strip()
     if assistant_message:
-        await append_turn(philosopher_id, session_id, user_message, assistant_message)
+        try:
+            await append_turn(philosopher_id, session_id, user_message, assistant_message)
+        except Exception:
+            logger.exception("Session memory save failed", extra={"persona": philosopher_id})
 
     yield json.dumps({"type": "done"})
