@@ -53,6 +53,11 @@ export type Organ = {
   lessonVideoUrl?: string;
 };
 
+/** Public path for the Animate modal function video (`/animations/<id>.mp4`). */
+export function organAnimationSrc(organId: OrganId): string {
+  return `/animations/${organId}.mp4`;
+}
+
 /** Turn a YouTube watch/share/embed URL into a privacy-enhanced embed src. */
 export function youtubeEmbedSrc(url: string): string | null {
   try {

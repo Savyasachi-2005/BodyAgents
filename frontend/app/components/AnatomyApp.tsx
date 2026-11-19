@@ -28,6 +28,7 @@ import { AuthMenu } from "./AuthMenu";
 import { NotesPanel } from "./NotesPanel";
 import { ProgressChip, ProgressPanel } from "./ProgressPanel";
 import { QuizFlow } from "./QuizFlow";
+import { OrganAnimationPlayer } from "./OrganAnimationPlayer";
 import { OrganArt } from "./OrganArt";
 import { SystemsView } from "./SystemsView";
 import { LessonsView } from "./LessonsView";
@@ -359,6 +360,25 @@ function LearningModal({
     // plural organs too.
     : type === "system" ? `${organName} in the body`
     : `Inside the ${organName.toLowerCase()}`;
+  if (type === "animation") {
+    return (
+      <div className="modal-backdrop" role="presentation" onMouseDown={onClose}>
+        <section
+          className="animation-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-label={`${organName} in motion`}
+          style={{ "--item-accent": organ.accent } as React.CSSProperties}
+          onMouseDown={(event) => event.stopPropagation()}
+        >
+          <button className="modal-close" onClick={onClose} aria-label="Close animation"><X size={18} /></button>
+          <OrganAnimationPlayer organ={organ} />
+          <p className="animation-modal-caption">{organName} in motion · {organ.function}</p>
+        </section>
+      </div>
+    );
+  }
+
   return (
     <div className="modal-backdrop" role="presentation" onMouseDown={onClose}>
       <section
@@ -401,7 +421,7 @@ function LearningModal({
         ) : (
           <>
             <p>Follow the highlighted structures, rotate the specimen, and connect form with function. This short study moment is designed to build a durable mental model.</p>
-            <div className={`modal-demo ${type === "animation" ? "moving" : ""}`}><OrganArt organ={organ} asset="organ" alt={`${organName} illustration`} /></div>
+            <div className="modal-demo"><OrganArt organ={organ} asset="organ" alt={`${organName} illustration`} /></div>
             <button className="lesson-button" onClick={onClose}>Continue exploring <ArrowRight size={16} /></button>
           </>
         )}

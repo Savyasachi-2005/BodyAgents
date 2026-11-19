@@ -99,7 +99,7 @@ export function ChatPanel({ philosopherId, onOpenNotes }: Props) {
     );
   });
   const [prevPhilosopherId, setPrevPhilosopherId] = useState(philosopherId);
-  const [prevUser, setPrevUser] = useState(user);
+  const [prevUserId, setPrevUserId] = useState(user?.id ?? null);
   const [streaming, setStreaming] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [status, setStatus] = useState<"idle" | "connecting" | "open" | "error">("idle");
@@ -114,17 +114,18 @@ export function ChatPanel({ philosopherId, onOpenNotes }: Props) {
   const recognitionRef = useRef<ISpeechRecognition | null>(null);
   const baseTextRef = useRef<string>("");
   const assistantIdRef = useRef<string | null>(null);
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+
+  const userId = user?.id ?? null;
 
   // Synchronize messages when philosopher or user changes (if not unmounted)
-  if (philosopherId !== prevPhilosopherId || user !== prevUser) {
+  if (philosopherId !== prevPhilosopherId || userId !== prevUserId) {
     setPrevPhilosopherId(philosopherId);
-    setPrevUser(user);
-    const userId = user?.id ?? "guest";
+    setPrevUserId(userId);
     setMessages(
       loadStoredMessages(
         philosopherId,
-        userId,
+        userId ?? "guest",
         createWelcomeMessage(philosopherId, Boolean(user)),
       ),
     );
@@ -136,9 +137,11 @@ export function ChatPanel({ philosopherId, onOpenNotes }: Props) {
     assistantIdRef.current = null;
   }
 
-  // Scroll to bottom when new messages arrive
+  // Keep the chat transcript pinned inside its own panel — never scroll the page.
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    const list = listRef.current;
+    if (!list) return;
+    list.scrollTop = list.scrollHeight;
   }, [messages, streaming]);
 
   // Clean up socket, speech recognition, and persist current messages on switch or unmount
@@ -455,7 +458,7 @@ export function ChatPanel({ philosopherId, onOpenNotes }: Props) {
         <Sparkles size={14} />
       </header>
 
-      <div className="chat-messages">
+      <div className="chat-messages" ref={listRef}>
         {messages.map((message) => (
           <div key={message.id} className={`chat-bubble ${message.role}`}>
             <p>{cleanChatText(message.content)}</p>
@@ -492,7 +495,6 @@ export function ChatPanel({ philosopherId, onOpenNotes }: Props) {
           </div>
         ))}
         {streaming && <div className="chat-typing">Thinking…</div>}
-        <div ref={bottomRef} />
       </div>
 
       {error && <p className="chat-error">{error}</p>}
