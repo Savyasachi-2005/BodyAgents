@@ -11,6 +11,7 @@ import {
   loadStoredMessages,
   saveStoredMessages,
   type ChatMessage,
+  type ChatSource,
 } from "../lib/chat-storage";
 
 export type { ChatMessage };
@@ -246,7 +247,11 @@ export function ChatPanel({ philosopherId, onOpenNotes }: Props) {
         const raw = String(event.data);
         if (raw.startsWith("{") && raw.endsWith("}")) {
           try {
-            const parsed = JSON.parse(raw) as { type?: string; message?: string };
+            const parsed = JSON.parse(raw) as {
+              type?: string;
+              message?: string;
+              sources?: ChatSource[];
+            };
             if (parsed.type === "done") {
               setStreaming(false);
               const finishedId = assistantIdRef.current;
@@ -254,7 +259,11 @@ export function ChatPanel({ philosopherId, onOpenNotes }: Props) {
                 setMessages((prev) => {
                   const next = prev.map((msg) =>
                     msg.id === finishedId
-                      ? { ...msg, content: cleanChatText(msg.content) }
+                      ? {
+                          ...msg,
+                          content: cleanChatText(msg.content),
+                          sources: parsed.sources?.length ? parsed.sources : msg.sources,
+                        }
                       : msg,
                   );
                   saveStoredMessages(philosopherId, user.id, next);
@@ -450,6 +459,25 @@ export function ChatPanel({ philosopherId, onOpenNotes }: Props) {
         {messages.map((message) => (
           <div key={message.id} className={`chat-bubble ${message.role}`}>
             <p>{cleanChatText(message.content)}</p>
+            {message.role === "assistant" && message.sources && message.sources.length > 0 && (
+              <div className="chat-sources" aria-label="Verified sources">
+                <span className="chat-sources-label">Sources</span>
+                <ul>
+                  {message.sources.map((source) => (
+                    <li key={`${source.title}-${source.url || source.publisher}`}>
+                      {source.url ? (
+                        <a href={source.url} target="_blank" rel="noreferrer">
+                          {source.title}
+                        </a>
+                      ) : (
+                        <span>{source.title}</span>
+                      )}
+                      <small>{source.publisher}</small>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
             {message.role !== "system" && message.content.trim() && (
               <button
                 type="button"

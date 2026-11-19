@@ -33,12 +33,19 @@ python -m venv .venv
 
 In Command Prompt, you can activate the environment first with `.venv\Scripts\activate.bat` and then use `python` and `uvicorn` normally. In PowerShell, use the explicit `.venv\Scripts\python.exe` and `.venv\Scripts\uvicorn.exe` commands above; this Python installation does not include a PowerShell activation script.
 
-Optional RAG seed:
+Optional verified sources + RAG seed:
 
 ```bash
+pip install -r requirements.txt
+python pipeline/scraper.py
 python pipeline/chunker.py
 python pipeline/embed_and_store.py
 ```
+
+`pipeline/scraper.py` only fetches the allowlisted MedlinePlus/NIH pages in
+`configs/sources.json`, then saves offline markdown under `seed/sources/`.
+`chunker.py` merges those verified pages with the local curated summaries and
+stores provenance (`source_url`, `publisher`, `trust_tier`) on every chunk.
 
 Ingestion is incremental: unchanged chunks (identified by a content hash) do
 not have their embeddings recomputed. It also bulk-upserts changed chunks.

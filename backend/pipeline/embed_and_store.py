@@ -48,6 +48,12 @@ def main() -> None:
             "text": row["text"],
             "source": row["source"],
             "section": row.get("section"),
+            "source_url": row.get("source_url"),
+            "source_title": row.get("source_title"),
+            "publisher": row.get("publisher"),
+            "license": row.get("license"),
+            "trust_tier": row.get("trust_tier") or "curated-summary",
+            "accessed_at": row.get("accessed_at"),
             "content_hash": row.get("content_hash"),
             "embedding": vector.tolist(),
         }

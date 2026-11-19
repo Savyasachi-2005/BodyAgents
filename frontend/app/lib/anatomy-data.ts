@@ -49,7 +49,33 @@ export type Organ = {
   /** Whether `/anatomy/<id>/*.webp` illustrations exist. Organs without them
    *  fall back to the accent glyph rather than a broken image. */
   illustrated: boolean;
+  /** Optional YouTube watch/share URL for the Lessons workspace player. */
+  lessonVideoUrl?: string;
 };
+
+/** Turn a YouTube watch/share/embed URL into a privacy-enhanced embed src. */
+export function youtubeEmbedSrc(url: string): string | null {
+  try {
+    const parsed = new URL(url.trim());
+    const host = parsed.hostname.replace(/^www\./, "");
+    let id = "";
+    if (host === "youtu.be") {
+      id = parsed.pathname.split("/").filter(Boolean)[0] ?? "";
+    } else if (host === "youtube.com" || host === "m.youtube.com" || host === "youtube-nocookie.com") {
+      if (parsed.pathname.startsWith("/embed/")) {
+        id = parsed.pathname.split("/")[2] ?? "";
+      } else if (parsed.pathname.startsWith("/shorts/")) {
+        id = parsed.pathname.split("/")[2] ?? "";
+      } else {
+        id = parsed.searchParams.get("v") ?? "";
+      }
+    }
+    if (!id || !/^[a-zA-Z0-9_-]{6,}$/.test(id)) return null;
+    return `https://www.youtube-nocookie.com/embed/${id}?rel=0`;
+  } catch {
+    return null;
+  }
+}
 
 export const organs: Organ[] = [
   {
@@ -74,6 +100,7 @@ export const organs: Organ[] = [
     comparison: "Heart vs. brain",
     conditions: ["Coronary artery disease", "Arrhythmia", "Heart valve disorders", "Heart failure", "Cardiomyopathy", "Myocarditis", "Atrial fibrillation", "Congenital heart defects"],
     illustrated: true,
+    lessonVideoUrl: "https://youtu.be/mC9tYJjmvYQ",
     hotspots: [
       { id: "aorta", label: "Aorta", detail: "Main artery", position: [-0.35, 1.65, 0.55], color: "#ee7c6a" },
       { id: "left-atrium", label: "Left Atrium", detail: "Receives oxygenated blood", position: [0.82, 0.65, 0.5], color: "#f2a33b" },
@@ -105,6 +132,7 @@ export const organs: Organ[] = [
     comparison: "Brain vs. eye",
     conditions: ["Migraine", "Stroke", "Neurodegenerative disease", "Epilepsy", "Traumatic brain injury", "Meningitis", "Multiple sclerosis", "Brain aneurysm"],
     illustrated: true,
+    lessonVideoUrl: "https://youtu.be/6wkcdMasbIY",
     hotspots: [
       { id: "frontal", label: "Frontal Lobe", detail: "Planning & movement", position: [-0.7, 0.65, 0.8], color: "#ee7c6a" },
       { id: "parietal", label: "Parietal Lobe", detail: "Sensory integration", position: [0.15, 1.1, 0.65], color: "#f2a33b" },
@@ -134,6 +162,7 @@ export const organs: Organ[] = [
     comparison: "Lungs vs. heart",
     conditions: ["Asthma", "COPD", "Pneumonia", "Pulmonary embolism", "Pulmonary fibrosis", "Bronchitis", "Cystic fibrosis", "Lung cancer"],
     illustrated: true,
+    lessonVideoUrl: "https://youtu.be/EGvIyhiNohk",
     hotspots: [
       { id: "trachea", label: "Trachea", detail: "Carries air to the lungs", position: [0, 1.6, 0.2], color: "#6393d8" },
       { id: "right-lung", label: "Right Lung", detail: "Three lobes", position: [-1.2, 0.1, 0.7], color: "#ee7c6a" },
@@ -166,6 +195,7 @@ export const organs: Organ[] = [
     comparison: "Bones vs. muscles",
     conditions: ["Fracture", "Osteoporosis", "Rickets", "Osteoarthritis", "Scoliosis", "Bone infection", "Stress fracture", "Growth plate injury"],
     illustrated: false,
+    lessonVideoUrl: "https://youtu.be/m9N5HMqT1RM",
     hotspots: [],
   },
   {
@@ -190,6 +220,7 @@ export const organs: Organ[] = [
     comparison: "Liver vs. intestine",
     conditions: ["Fatty liver disease", "Hepatitis", "Cirrhosis", "Gallstones", "Haemochromatosis", "Liver cancer", "Autoimmune hepatitis", "Portal hypertension"],
     illustrated: true,
+    lessonVideoUrl: "https://youtu.be/E9zTnGxLZ_s",
     hotspots: [
       { id: "right-lobe", label: "Right Lobe", detail: "Largest hepatic lobe", position: [-0.75, 0.35, 0.75], color: "#ee7c6a" },
       { id: "left-lobe", label: "Left Lobe", detail: "Crosses the midline", position: [0.85, 0.25, 0.75], color: "#f2a33b" },
@@ -218,6 +249,7 @@ export const organs: Organ[] = [
     comparison: "Kidneys vs. liver",
     conditions: ["Kidney stones", "Chronic kidney disease", "Urinary infection", "Glomerulonephritis", "Polycystic kidney disease", "Renal hypertension", "Acute kidney injury", "Nephrotic syndrome"],
     illustrated: true,
+    lessonVideoUrl: "https://youtu.be/eWf2wawKnZA",
     hotspots: [
       { id: "cortex", label: "Renal Cortex", detail: "Outer filtering layer", position: [-0.9, 0.55, 0.7], color: "#ee7c6a" },
       { id: "medulla", label: "Renal Medulla", detail: "Concentrates urine", position: [0.85, 0.2, 0.7], color: "#f2a33b" },
@@ -246,6 +278,7 @@ export const organs: Organ[] = [
     comparison: "Eye vs. brain",
     conditions: ["Myopia", "Cataract", "Glaucoma", "Macular degeneration", "Retinal detachment", "Dry eye disease", "Astigmatism", "Conjunctivitis"],
     illustrated: true,
+    lessonVideoUrl: "https://youtu.be/GmaJYcu5PCo",
     hotspots: [
       { id: "cornea", label: "Cornea", detail: "Clear focusing surface", position: [-0.94, 0.05, 1.47], color: "#6393d8" },
       { id: "iris", label: "Iris", detail: "Controls light entry", position: [-1.22, -0.53, 1.15], color: "#f2a33b" },
@@ -274,6 +307,7 @@ export const organs: Organ[] = [
     comparison: "Intestine vs. liver",
     conditions: ["Irritable bowel syndrome", "Inflammatory bowel disease", "Celiac disease", "Diverticulitis", "Intestinal obstruction", "Colorectal polyps", "Crohn's disease", "Lactose intolerance"],
     illustrated: true,
+    lessonVideoUrl: "https://youtu.be/r3GVrC0SBTo",
     hotspots: [
       { id: "duodenum", label: "Duodenum", detail: "First small-intestine segment", position: [0.6, 0.8, 0.75], color: "#f2a33b" },
       { id: "jejunum", label: "Jejunum", detail: "Major absorption region", position: [-0.45, 0.1, 0.82], color: "#ee7c6a" },
@@ -302,6 +336,7 @@ export const organs: Organ[] = [
     comparison: "Pancreas vs. liver",
     conditions: ["Pancreatitis", "Type 1 diabetes", "Pancreatic cancer", "Type 2 diabetes", "Exocrine insufficiency", "Pancreatic cysts", "Gallstone pancreatitis", "Insulinoma"],
     illustrated: true,
+    lessonVideoUrl: "https://youtu.be/jwhw-C4uDPw",
     hotspots: [
       { id: "head", label: "Head", detail: "Cradled by the duodenum", position: [-1.32, -0.36, 0.55], color: "#ee7c6a" },
       { id: "body", label: "Body", detail: "Crosses the spine", position: [0.05, 0.25, 0.45], color: "#f2a33b" },
@@ -331,6 +366,7 @@ export const organs: Organ[] = [
     comparison: "Skin vs. intestine",
     conditions: ["Eczema", "Psoriasis", "Melanoma", "Acne vulgaris", "Cellulitis", "Contact dermatitis", "Rosacea", "Vitiligo"],
     illustrated: true,
+    lessonVideoUrl: "https://youtu.be/CbXLyUdjsdo",
     hotspots: [
       { id: "epidermis", label: "Epidermis", detail: "Outer protective layer", position: [-0.05, 0.88, 1.4], color: "#ee7c6a" },
       { id: "dermis", label: "Dermis", detail: "Nerves, vessels & glands", position: [0.29, 0.05, 1.4], color: "#f2a33b" },
@@ -341,3 +377,130 @@ export const organs: Organ[] = [
 ];
 
 export const organById = Object.fromEntries(organs.map((organ) => [organ.id, organ])) as Record<OrganId, Organ>;
+
+export type BodySystemGroup = {
+  name: string;
+  organs: Organ[];
+  summary: string;
+};
+
+const SYSTEM_SUMMARIES: Record<string, string> = {
+  Cardiovascular: "Moves blood so oxygen and nutrients reach every cell.",
+  "Nervous System": "Senses the world, makes decisions, and coordinates movement.",
+  "Respiratory System": "Brings in oxygen and clears carbon dioxide with every breath.",
+  "Skeletal System": "Shapes the body, protects organs, and works with muscles to move.",
+  "Digestive System": "Breaks food into usable fuel and absorbs what the body needs.",
+  "Urinary System": "Filters blood, balances fluids, and removes waste as urine.",
+  "Sensory System": "Turns light, sound, and other signals into experiences you can notice.",
+  "Endocrine System": "Uses hormones to steady growth, energy, and internal balance.",
+  "Integumentary System": "Protects the body, senses touch, and helps control temperature.",
+};
+
+/** Group organs by body system for the Systems workspace. */
+export function organsBySystem(): BodySystemGroup[] {
+  const groups = new Map<string, Organ[]>();
+  for (const organ of organs) {
+    const list = groups.get(organ.system) ?? [];
+    list.push(organ);
+    groups.set(organ.system, list);
+  }
+  return Array.from(groups.entries()).map(([name, members]) => ({
+    name,
+    organs: members,
+    summary: SYSTEM_SUMMARIES[name] ?? `Organs that support the ${name.toLowerCase()}.`,
+  }));
+}
+
+export type OrganLesson = {
+  organ: Organ;
+  title: string;
+  summary: string;
+  /** Plain-language “what it does for you”. */
+  inPlainEnglish: string;
+  /** Simple everyday care / awareness tip. */
+  everydayTip: string;
+  focus: string;
+  takeaway: string;
+  parts: { label: string; detail: string }[];
+};
+
+/** Friendly study notes that sit on top of the shared organ facts. */
+const LESSON_FRIENDLY: Record<OrganId, { inPlainEnglish: string; everydayTip: string }> = {
+  heart: {
+    inPlainEnglish:
+      "Your heart is a pump with four rooms. It pushes oxygen-rich blood out to the body and brings used blood back so the lungs can refresh it.",
+    everydayTip:
+      "Steady movement, sleep, and not smoking help the coronary arteries that feed the heart muscle stay clear.",
+  },
+  brain: {
+    inPlainEnglish:
+      "Your brain is the body’s control room. It reads senses, stores memories, shapes feelings, and tells muscles when to move.",
+    everydayTip:
+      "Protect your head, stay hydrated, and give yourself sleep — the brain uses a lot of energy and needs recovery time.",
+  },
+  lungs: {
+    inPlainEnglish:
+      "Your lungs pull in oxygen and send out carbon dioxide. Tiny air sacs called alveoli do the gas swap with your blood.",
+    everydayTip:
+      "Clean air and regular breathing exercise matter — smoke and heavy pollution make that delicate exchange harder.",
+  },
+  bones: {
+    inPlainEnglish:
+      "Bones are living tissue that hold you up, shield organs, and work with muscles so you can walk, lift, and balance.",
+    everydayTip:
+      "Weight-bearing activity plus calcium and vitamin D help bones remodel and stay strong as you grow and age.",
+  },
+  liver: {
+    inPlainEnglish:
+      "Your liver is a quiet chemistry lab. It processes nutrients, cleans many toxins from blood, and makes bile for digestion.",
+    everydayTip:
+      "Go easy on alcohol and ultra-processed foods — the liver regenerates well, but constant overload still wears it down.",
+  },
+  kidneys: {
+    inPlainEnglish:
+      "Your kidneys filter blood all day. They keep salt and water balanced and remove waste that leaves the body as urine.",
+    everydayTip:
+      "Drink enough water and don’t ignore pain when peeing — early attention helps protect these filters.",
+  },
+  eyeball: {
+    inPlainEnglish:
+      "Your eye focuses light onto the retina, which turns it into signals the brain reads as sight.",
+    everydayTip:
+      "Rest your eyes during screen time and protect them from UV light — the cornea and retina both need care.",
+  },
+  intestine: {
+    inPlainEnglish:
+      "Your intestine breaks food further and absorbs nutrients. A huge community of microbes there also supports immunity.",
+    everydayTip:
+      "Fiber-rich foods and varied plants feed a healthier gut microbiome and steadier digestion.",
+  },
+  pancreas: {
+    inPlainEnglish:
+      "Your pancreas has two jobs: releasing digestive enzymes into the gut, and making insulin to manage blood sugar.",
+    everydayTip:
+      "Balanced meals help the insulin side of the pancreas; heavy alcohol use can inflame the digestive side.",
+  },
+  skin: {
+    inPlainEnglish:
+      "Skin is your outer shield. It keeps water in, blocks many germs, senses touch, and helps control temperature.",
+    everydayTip:
+      "Gentle cleansing, moisturizer, and sunscreen protect the barrier you use every day.",
+  },
+};
+
+/** Short lesson sheets derived from existing organ fields (frontend-only). */
+export function organLessons(): OrganLesson[] {
+  return organs.map((organ) => {
+    const friendly = LESSON_FRIENDLY[organ.id];
+    return {
+      organ,
+      title: `Inside the ${organ.name}`,
+      summary: organ.description,
+      inPlainEnglish: friendly.inPlainEnglish,
+      everydayTip: friendly.everydayTip,
+      focus: organ.function,
+      takeaway: organ.funFact,
+      parts: organ.hotspots.map((spot) => ({ label: spot.label, detail: spot.detail })),
+    };
+  });
+}

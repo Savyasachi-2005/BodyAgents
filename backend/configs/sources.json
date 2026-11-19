@@ -1,0 +1,103 @@
+{
+  "sources": [
+    {
+      "id": "medlineplus-heart",
+      "body_part_id": "heart",
+      "url": "https://medlineplus.gov/heartdiseases.html",
+      "title": "Heart Diseases",
+      "publisher": "MedlinePlus / NIH",
+      "license": "U.S. government public domain / educational reuse with attribution",
+      "trust_tier": "gov"
+    },
+    {
+      "id": "medlineplus-brain",
+      "body_part_id": "brain",
+      "url": "https://medlineplus.gov/braindiseases.html",
+      "title": "Brain Diseases",
+      "publisher": "MedlinePlus / NIH",
+      "license": "U.S. government public domain / educational reuse with attribution",
+      "trust_tier": "gov"
+    },
+    {
+      "id": "medlineplus-lungs",
+      "body_part_id": "lungs",
+      "url": "https://medlineplus.gov/lungdiseases.html",
+      "title": "Lung Diseases",
+      "publisher": "MedlinePlus / NIH",
+      "license": "U.S. government public domain / educational reuse with attribution",
+      "trust_tier": "gov"
+    },
+    {
+      "id": "medlineplus-bones",
+      "body_part_id": "bones",
+      "url": "https://medlineplus.gov/bonediseases.html",
+      "title": "Bone Diseases",
+      "publisher": "MedlinePlus / NIH",
+      "license": "U.S. government public domain / educational reuse with attribution",
+      "trust_tier": "gov"
+    },
+    {
+      "id": "medlineplus-liver",
+      "body_part_id": "liver",
+      "url": "https://medlineplus.gov/liverdiseases.html",
+      "title": "Liver Diseases",
+      "publisher": "MedlinePlus / NIH",
+      "license": "U.S. government public domain / educational reuse with attribution",
+      "trust_tier": "gov"
+    },
+    {
+      "id": "medlineplus-kidneys",
+      "body_part_id": "kidneys",
+      "url": "https://medlineplus.gov/kidneydiseases.html",
+      "title": "Kidney Diseases",
+      "publisher": "MedlinePlus / NIH",
+      "license": "U.S. government public domain / educational reuse with attribution",
+      "trust_tier": "gov"
+    },
+    {
+      "id": "medlineplus-eyeball",
+      "body_part_id": "eyeball",
+      "url": "https://medlineplus.gov/eyediseases.html",
+      "title": "Eye Diseases",
+      "publisher": "MedlinePlus / NIH",
+      "license": "U.S. government public domain / educational reuse with attribution",
+      "trust_tier": "gov"
+    },
+    {
+      "id": "medlineplus-intestine",
+      "body_part_id": "intestine",
+      "url": "https://medlineplus.gov/digestivesystem.html",
+      "title": "Digestive System",
+      "publisher": "MedlinePlus / NIH",
+      "license": "U.S. government public domain / educational reuse with attribution",
+      "trust_tier": "gov"
+    },
+    {
+      "id": "medlineplus-pancreas",
+      "body_part_id": "pancreas",
+      "url": "https://medlineplus.gov/pancreaticdiseases.html",
+      "title": "Pancreatic Disorders",
+      "publisher": "MedlinePlus / NIH",
+      "license": "U.S. government public domain / educational reuse with attribution",
+      "trust_tier": "gov"
+    },
+    {
+      "id": "medlineplus-skin",
+      "body_part_id": "skin",
+      "url": "https://medlineplus.gov/ency/article/004014.htm",
+      "title": "Aging changes in skin",
+      "publisher": "MedlinePlus / NIH",
+      "license": "U.S. government public domain / educational reuse with attribution",
+      "trust_tier": "gov"
+    },
+    {
+      "id": "medlineplus-digestive",
+      "body_part_id": "digestive",
+      "url": "https://medlineplus.gov/digestivesystem.html",
+      "title": "Digestive System",
+      "publisher": "MedlinePlus / NIH",
+      "license": "U.S. government public domain / educational reuse with attribution",
+      "trust_tier": "gov"
+    }
+  ]
+}

@@ -14,6 +14,7 @@ from langgraph.graph import END, START, StateGraph
 from app.config import get_settings
 from app.memory.sessions import append_turn, get_history
 from app.personas import get_persona
+from app.memory.vectorstore import unique_sources
 from app.rag.retrieve import retrieve_passages
 
 logger = logging.getLogger(__name__)
@@ -83,11 +84,19 @@ def _build_system_prompt(persona: dict[str, Any], retrieved: list[dict[str, Any]
             "Use only reliable educational knowledge. Prefer short answers."
         )
 
-    context_blocks = [f"[{index}] {passage['text']} (source: {passage.get('source', 'seed')})" for index, passage in enumerate(retrieved, start=1)]
+    context_blocks = []
+    for index, passage in enumerate(retrieved, start=1):
+        label = passage.get("source_title") or passage.get("source") or "source"
+        publisher = passage.get("publisher") or "educational source"
+        trust = passage.get("trust_tier") or "curated-summary"
+        context_blocks.append(
+            f"[{index}] {passage['text']} (source: {label}; publisher: {publisher}; trust: {trust})"
+        )
     context = "\n".join(context_blocks)
     return (
         f"{base}\n{style}\n{memory_rules}\n{format_rules}\n"
         "Ground factual claims in the retrieved context without naming citation numbers. "
+        "Prefer higher-trust sources (gov/edu) over curated summaries. "
         "If the context is insufficient, explicitly say so instead of inventing anatomy facts.\n"
         f"Retrieved context:\n{context}"
     )
@@ -231,4 +240,5 @@ async def stream_reply(
         except Exception:
             logger.exception("Session memory save failed", extra={"persona": philosopher_id})
 
-    yield json.dumps({"type": "done"})
+    sources = unique_sources(prepared.get("retrieved") or [])
+    yield json.dumps({"type": "done", "sources": sources})

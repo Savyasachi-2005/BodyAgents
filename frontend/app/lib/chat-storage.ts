@@ -1,9 +1,17 @@
 import type { PersonaId } from "./personas";
 
+export type ChatSource = {
+  title: string;
+  publisher: string;
+  url?: string;
+  trust_tier?: string;
+};
+
 export type ChatMessage = {
   id: string;
   role: "user" | "assistant" | "system";
   content: string;
+  sources?: ChatSource[];
 };
 
 const CHAT_STORAGE_PREFIX = "bodyagents_chat_messages_";

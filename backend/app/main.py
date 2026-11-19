@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from contextlib import asynccontextmanager
@@ -14,14 +15,29 @@ from app.personas import known_persona_ids
 from app.routes.auth import router as auth_router
 from app.ws.manager import manager
 
+logger = logging.getLogger(__name__)
+
+
+async def _warm_embedder() -> None:
+    """Load MiniLM in the background so the first chat does not time out."""
+    try:
+        from app.memory.vectorstore import embed_texts
+
+        await asyncio.to_thread(embed_texts, ["warmup"])
+        logger.info("Embedding model warmed up")
+    except Exception:
+        logger.warning("Embedding warm-up failed; chat will use text fallback until ready", exc_info=True)
+
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     try:
         await ensure_indexes()
     except Exception:
-        logging.getLogger(__name__).warning("Database indexes were not initialized", exc_info=True)
+        logger.warning("Database indexes were not initialized", exc_info=True)
+    warm_task = asyncio.create_task(_warm_embedder())
     yield
+    warm_task.cancel()
     await close_client()
 
 
