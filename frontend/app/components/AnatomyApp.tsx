@@ -26,6 +26,8 @@ import { OrganViewer } from "./OrganViewer";
 import { ChatPanel } from "./ChatPanel";
 import { AuthMenu } from "./AuthMenu";
 import { NotesPanel } from "./NotesPanel";
+import { ProgressChip, ProgressPanel } from "./ProgressPanel";
+import { QuizFlow } from "./QuizFlow";
 import { OrganArt } from "./OrganArt";
 import { SystemsView } from "./SystemsView";
 import { LessonsView } from "./LessonsView";
@@ -38,7 +40,7 @@ type Modal = "lesson" | "quiz" | "animation" | "system" | null;
 type WorkspaceView = "explore" | "systems" | "lessons" | "library";
 
 export function AnatomyApp() {
-  const { requireAuth } = useAuth();
+  const { user, requireAuth } = useAuth();
   const [organId, setOrganId] = useState<OrganId>("heart");
   const [activeView, setActiveView] = useState<WorkspaceView>("explore");
   const [lessonFocusId, setLessonFocusId] = useState<OrganId>("heart");
@@ -46,6 +48,7 @@ export function AnatomyApp() {
   const [compare, setCompare] = useState(false);
   const [modal, setModal] = useState<Modal>(null);
   const [notesOpen, setNotesOpen] = useState(false);
+  const [progressOpen, setProgressOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [mobileLibrary, setMobileLibrary] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -67,7 +70,11 @@ export function AnatomyApp() {
   }, [organId]);
 
   useEffect(() => {
-    const onLogout = () => setNotesOpen(false);
+    const onLogout = () => {
+      setNotesOpen(false);
+      setProgressOpen(false);
+      setModal((current) => (current === "quiz" ? null : current));
+    };
     window.addEventListener("bodyagents:auth-logout", onLogout);
     return () => window.removeEventListener("bodyagents:auth-logout", onLogout);
   }, []);
@@ -75,6 +82,17 @@ export function AnatomyApp() {
   const openNotes = () => {
     if (!requireAuth()) return;
     setNotesOpen(true);
+  };
+
+  const openQuiz = (id: OrganId = organId) => {
+    if (!requireAuth()) return;
+    setOrganId(id);
+    setModal("quiz");
+  };
+
+  const openProgress = () => {
+    if (!requireAuth()) return;
+    setProgressOpen(true);
   };
 
   const selectOrgan = (id: OrganId) => {
@@ -138,6 +156,7 @@ export function AnatomyApp() {
           <Search size={17} />
           <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search organs, topics…" />
         </label>
+        <ProgressChip onOpen={openProgress} />
         <AuthMenu />
         <button className="mobile-library-trigger" onClick={() => setMobileLibrary(true)} aria-label="Open organ library"><LibraryBig size={20} /></button>
       </header>
@@ -212,7 +231,7 @@ export function AnatomyApp() {
               <button className="lesson-button" data-reveal onClick={() => setModal("lesson")}>View lesson <ArrowRight size={16} /></button>
               <div className="action-grid" data-reveal>
                 <button onClick={() => setModal("animation")}><Play size={15} /> Animate</button>
-                <button onClick={() => setModal("quiz")}><CircleHelp size={15} /> Quiz</button>
+                <button onClick={() => openQuiz(organId)}><CircleHelp size={15} /> Quiz</button>
                 <button onClick={() => setCompare(!compare)} className={compare ? "active" : ""}><Share2 size={15} /> Compare</button>
               </div>
               <div data-reveal>
@@ -285,15 +304,29 @@ export function AnatomyApp() {
       ) : (
         <div className="workspace-alt">
           {activeView === "systems" && <SystemsView onSelectOrgan={selectOrgan} />}
-          {activeView === "lessons" && <LessonsView focusOrganId={lessonFocusId} onSelectOrgan={selectOrgan} />}
+          {activeView === "lessons" && (
+            <LessonsView
+              focusOrganId={lessonFocusId}
+              onSelectOrgan={selectOrgan}
+              onTakeQuiz={openQuiz}
+            />
+          )}
           {activeView === "library" && (
             <LibraryView query={query} onSelectOrgan={selectOrgan} onOpenLesson={openLesson} />
           )}
         </div>
       )}
 
-      {modal && <LearningModal type={modal} organ={organ} onClose={() => setModal(null)} />}
+      {modal && (
+        <LearningModal
+          type={modal}
+          organ={organ}
+          userId={user?.id}
+          onClose={() => setModal(null)}
+        />
+      )}
       <NotesPanel open={notesOpen} onClose={() => setNotesOpen(false)} />
+      <ProgressPanel open={progressOpen} onClose={() => setProgressOpen(false)} />
       {mobileLibrary && <button className="drawer-backdrop" aria-label="Close library" onClick={() => setMobileLibrary(false)} />}
     </main>
   );
@@ -306,7 +339,17 @@ const MODAL_ICON: Record<Exclude<Modal, null>, string> = {
   lesson: "✦",
 };
 
-function LearningModal({ type, organ, onClose }: { type: Exclude<Modal, null>; organ: Organ; onClose: () => void }) {
+function LearningModal({
+  type,
+  organ,
+  userId,
+  onClose,
+}: {
+  type: Exclude<Modal, null>;
+  organ: Organ;
+  userId?: string;
+  onClose: () => void;
+}) {
   const organName = organ.name;
   const title =
     type === "quiz" ? `${organName} quick quiz`
@@ -319,23 +362,27 @@ function LearningModal({ type, organ, onClose }: { type: Exclude<Modal, null>; o
   return (
     <div className="modal-backdrop" role="presentation" onMouseDown={onClose}>
       <section
-        className={`learning-modal ${type === "system" ? "wide" : ""}`}
+        className={`learning-modal ${type === "system" || type === "quiz" ? "wide" : ""} ${type === "quiz" ? "quiz-shell" : ""}`}
         role="dialog"
         aria-modal="true"
-        aria-labelledby="modal-title"
+        aria-labelledby={type === "quiz" ? undefined : "modal-title"}
+        aria-label={type === "quiz" ? `${organName} quick quiz` : undefined}
         onMouseDown={(event) => event.stopPropagation()}
       >
         <button className="modal-close" onClick={onClose} aria-label="Close"><X size={18} /></button>
-        <span className="modal-icon">{MODAL_ICON[type]}</span>
-        <em>Guided discovery</em>
-        <h2 id="modal-title">{title}</h2>
+        {type !== "quiz" ? (
+          <>
+            <span className="modal-icon">{MODAL_ICON[type]}</span>
+            <em>Guided discovery</em>
+            <h2 id="modal-title">{title}</h2>
+          </>
+        ) : null}
         {type === "quiz" ? (
-          <div className="quiz-options">
-            <p>Which statement best describes the {organName.toLowerCase()}?</p>
-            <button onClick={onClose}>It plays a specialized role in maintaining the body</button>
-            <button onClick={onClose}>It works completely independently</button>
-            <button onClick={onClose}>It is active only during sleep</button>
-          </div>
+          userId ? (
+            <QuizFlow key={organ.id} organ={organ} userId={userId} onClose={onClose} />
+          ) : (
+            <p>Sign in to take quizzes and save your XP, coins, and streaks.</p>
+          )
         ) : type === "system" ? (
           <>
             <p>{organ.location}. Trace how the {organName.toLowerCase()} connects to the rest of the body.</p>

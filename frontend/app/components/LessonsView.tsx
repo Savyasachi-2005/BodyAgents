@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import {
   ArrowRight,
   BookOpen,
+  CircleHelp,
   Droplets,
   ExternalLink,
   HandHeart,
@@ -20,9 +21,10 @@ import { OrganArt } from "./OrganArt";
 type Props = {
   focusOrganId?: OrganId;
   onSelectOrgan: (id: OrganId) => void;
+  onTakeQuiz: (id: OrganId) => void;
 };
 
-export function LessonsView({ focusOrganId, onSelectOrgan }: Props) {
+export function LessonsView({ focusOrganId, onSelectOrgan, onTakeQuiz }: Props) {
   const lessons = organLessons();
   const [activeId, setActiveId] = useState<OrganId>(focusOrganId ?? lessons[0]?.organ.id ?? "heart");
   const active = lessons.find((lesson) => lesson.organ.id === activeId) ?? lessons[0];
@@ -175,13 +177,22 @@ export function LessonsView({ focusOrganId, onSelectOrgan }: Props) {
             </div>
           ) : null}
 
-          <button
-            type="button"
-            className="lesson-button"
-            onClick={() => onSelectOrgan(organ.id)}
-          >
-            Explore {organ.name} in 3D <ArrowRight size={16} />
-          </button>
+          <div className="lesson-actions">
+            <button
+              type="button"
+              className="lesson-button secondary"
+              onClick={() => onTakeQuiz(organ.id)}
+            >
+              <CircleHelp size={15} /> Take quiz
+            </button>
+            <button
+              type="button"
+              className="lesson-button"
+              onClick={() => onSelectOrgan(organ.id)}
+            >
+              Explore {organ.name} in 3D <ArrowRight size={16} />
+            </button>
+          </div>
         </article>
       </div>
     </section>

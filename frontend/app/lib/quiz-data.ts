@@ -1,0 +1,643 @@
+import type { OrganId } from "./anatomy-data";
+
+export type QuizQuestion = {
+  id: string;
+  prompt: string;
+  choices: [string, string, string, string];
+  correctIndex: 0 | 1 | 2 | 3;
+  explain: string;
+};
+
+export type OrganQuiz = {
+  organId: OrganId;
+  questions: QuizQuestion[];
+};
+
+const QUIZZES: Record<OrganId, QuizQuestion[]> = {
+  heart: [
+    {
+      id: "heart-1",
+      prompt: "What is the heart’s main job?",
+      choices: [
+        "Circulates oxygenated blood through the body",
+        "Filters waste from blood into urine",
+        "Stores memories and emotions",
+        "Produces digestive enzymes",
+      ],
+      correctIndex: 0,
+      explain: "The heart is a muscular pump that moves blood so oxygen and nutrients reach every cell.",
+    },
+    {
+      id: "heart-2",
+      prompt: "About how large is a typical adult heart?",
+      choices: [
+        "About the size of your fist",
+        "About the size of a football",
+        "About 24 mm across",
+        "Roughly two clenched fists",
+      ],
+      correctIndex: 0,
+      explain: "A common teaching comparison: the heart is roughly fist-sized.",
+    },
+    {
+      id: "heart-3",
+      prompt: "Where does the heart sit in the chest?",
+      choices: [
+        "Behind the sternum, slightly left",
+        "Upper right abdomen",
+        "Within the bony orbit",
+        "Either side of the spine below the ribs",
+      ],
+      correctIndex: 0,
+      explain: "It sits behind the breastbone, tilted a little toward the left.",
+    },
+    {
+      id: "heart-4",
+      prompt: "Which vessels feed the heart muscle itself?",
+      choices: [
+        "Left and right coronary arteries",
+        "Renal arteries",
+        "Hepatic portal vein only",
+        "Bronchial airways",
+      ],
+      correctIndex: 0,
+      explain: "Coronary arteries supply the heart wall with oxygen-rich blood.",
+    },
+    {
+      id: "heart-5",
+      prompt: "About how many times does the heart beat in a day?",
+      choices: [
+        "About 100,000 times",
+        "About 1,000 times",
+        "About 11,000 times",
+        "About 500 times",
+      ],
+      correctIndex: 0,
+      explain: "At a normal resting rate, the heart beats on the order of 100,000 times daily.",
+    },
+  ],
+  brain: [
+    {
+      id: "brain-1",
+      prompt: "What best describes the brain’s role?",
+      choices: [
+        "Processes and coordinates signals for the body",
+        "Exchanges oxygen for carbon dioxide",
+        "Pumps blood to the lungs only",
+        "Absorbs nutrients from food",
+      ],
+      correctIndex: 0,
+      explain: "The brain integrates sensation, memory, emotion, and movement commands.",
+    },
+    {
+      id: "brain-2",
+      prompt: "Roughly how much of the body’s energy does the brain use?",
+      choices: [
+        "About 20%",
+        "About 2%",
+        "About 50%",
+        "Almost none at rest",
+      ],
+      correctIndex: 0,
+      explain: "Despite its size, the brain is an energy-hungry organ — around a fifth of resting energy use.",
+    },
+    {
+      id: "brain-3",
+      prompt: "Which lobe is especially linked with planning and movement?",
+      choices: [
+        "Frontal lobe",
+        "Cerebellum only",
+        "Optic nerve",
+        "Renal cortex",
+      ],
+      correctIndex: 0,
+      explain: "The frontal lobe helps with planning, decision-making, and voluntary movement.",
+    },
+    {
+      id: "brain-4",
+      prompt: "Where is the brain protected?",
+      choices: [
+        "Within the skull",
+        "Inside the ribcage alone",
+        "Behind the stomach",
+        "In the pelvic cavity",
+      ],
+      correctIndex: 0,
+      explain: "Bone, membranes, and fluid cushion the brain inside the skull.",
+    },
+    {
+      id: "brain-5",
+      prompt: "Why don’t headaches come from “brain pain receptors”?",
+      choices: [
+        "The brain itself has no pain receptors",
+        "The brain never receives blood",
+        "Pain only comes from the lungs",
+        "Neurons cannot send signals",
+      ],
+      correctIndex: 0,
+      explain: "Headache pain is usually felt in surrounding tissues, vessels, and membranes — not brain tissue itself.",
+    },
+  ],
+  lungs: [
+    {
+      id: "lungs-1",
+      prompt: "What do the lungs primarily exchange?",
+      choices: [
+        "Oxygen for carbon dioxide",
+        "Food for water",
+        "Hormones for enzymes",
+        "Light for nerve signals",
+      ],
+      correctIndex: 0,
+      explain: "Breathing brings O₂ in and clears CO₂ out across the alveolar surface.",
+    },
+    {
+      id: "lungs-2",
+      prompt: "Which airway carries air down toward the lungs?",
+      choices: [
+        "Trachea",
+        "Ureter",
+        "Aorta",
+        "Optic nerve",
+      ],
+      correctIndex: 0,
+      explain: "The trachea (windpipe) branches into bronchi that enter each lung.",
+    },
+    {
+      id: "lungs-3",
+      prompt: "Why does the left lung usually have fewer lobes?",
+      choices: [
+        "To leave room for the heart",
+        "Because it does not exchange gas",
+        "Because it sits in the skull",
+        "Because it filters urine",
+      ],
+      correctIndex: 0,
+      explain: "The left lung typically has two lobes and a cardiac notch for the heart.",
+    },
+    {
+      id: "lungs-4",
+      prompt: "Where do the lungs sit?",
+      choices: [
+        "Either side of the heart, within the ribcage",
+        "Only in the lower abdomen",
+        "Inside the bony orbit",
+        "Behind the kidneys",
+      ],
+      correctIndex: 0,
+      explain: "Paired lungs fill most of the chest around the heart.",
+    },
+    {
+      id: "lungs-5",
+      prompt: "What are alveoli mainly for?",
+      choices: [
+        "Gas exchange with blood",
+        "Making red blood cells",
+        "Storing bile",
+        "Hearing sound",
+      ],
+      correctIndex: 0,
+      explain: "Alveoli create a huge surface where air and blood trade gases.",
+    },
+  ],
+  bones: [
+    {
+      id: "bones-1",
+      prompt: "Which is a primary job of bones?",
+      choices: [
+        "Support, protect, and enable movement",
+        "Pump blood through arteries",
+        "Focus light onto the retina",
+        "Filter urine from blood",
+      ],
+      correctIndex: 0,
+      explain: "The skeleton frames the body, shields organs, and works with muscles.",
+    },
+    {
+      id: "bones-2",
+      prompt: "About how many bones do most adults have?",
+      choices: [
+        "206",
+        "26",
+        "506",
+        "106",
+      ],
+      correctIndex: 0,
+      explain: "Most adults have 206 bones after some childhood bones fuse.",
+    },
+    {
+      id: "bones-3",
+      prompt: "What does marrow inside some bones help make?",
+      choices: [
+        "Blood cells",
+        "Bile only",
+        "Insulin only",
+        "Sweat only",
+      ],
+      correctIndex: 0,
+      explain: "Bone marrow is a major site of blood-cell production.",
+    },
+    {
+      id: "bones-4",
+      prompt: "Why do babies often have more bones than adults?",
+      choices: [
+        "Some bones fuse as you grow",
+        "Adults lose bones every year",
+        "Babies have no cartilage",
+        "Adults grow extra skulls",
+      ],
+      correctIndex: 0,
+      explain: "Many separate bones in infancy join into larger adult bones.",
+    },
+    {
+      id: "bones-5",
+      prompt: "Bone tissue is best described as:",
+      choices: [
+        "Living tissue that constantly remodels",
+        "Dead rock that never changes",
+        "Only fat with no minerals",
+        "A type of lung alveolus",
+      ],
+      correctIndex: 0,
+      explain: "Bones remodel throughout life in response to load and chemistry.",
+    },
+  ],
+  liver: [
+    {
+      id: "liver-1",
+      prompt: "Which jobs belong to the liver?",
+      choices: [
+        "Metabolism, detoxification, and bile production",
+        "Pumping blood to the feet only",
+        "Focusing images on the retina",
+        "Making urine in the bladder",
+      ],
+      correctIndex: 0,
+      explain: "The liver processes nutrients, clears many toxins, and makes bile.",
+    },
+    {
+      id: "liver-2",
+      prompt: "Where is the liver mainly located?",
+      choices: [
+        "Upper right abdomen",
+        "Inside the skull",
+        "Lower left calf",
+        "Behind both ears",
+      ],
+      correctIndex: 0,
+      explain: "Most of the liver sits under the ribs on the right side.",
+    },
+    {
+      id: "liver-3",
+      prompt: "What special ability is the liver famous for?",
+      choices: [
+        "Regenerating a large portion of lost tissue",
+        "Never needing blood supply",
+        "Storing all body oxygen",
+        "Hearing high frequencies",
+      ],
+      correctIndex: 0,
+      explain: "Healthy liver tissue can regrow substantially after injury or surgery.",
+    },
+    {
+      id: "liver-4",
+      prompt: "Which vessel brings nutrient-rich blood from the gut to the liver?",
+      choices: [
+        "Portal vein",
+        "Optic nerve",
+        "Trachea",
+        "Ureter",
+      ],
+      correctIndex: 0,
+      explain: "The hepatic portal vein carries absorbed nutrients for processing.",
+    },
+    {
+      id: "liver-5",
+      prompt: "About how many functions can the liver perform?",
+      choices: [
+        "More than 500",
+        "Exactly 5",
+        "Only 1",
+        "None while awake",
+      ],
+      correctIndex: 0,
+      explain: "It is a multi-tasking metabolic hub with hundreds of roles.",
+    },
+  ],
+  kidneys: [
+    {
+      id: "kidneys-1",
+      prompt: "What do the kidneys primarily do?",
+      choices: [
+        "Filter blood and form urine",
+        "Pump blood to the brain only",
+        "Digest fats in the mouth",
+        "Store visual memories",
+      ],
+      correctIndex: 0,
+      explain: "Kidneys balance fluid and electrolytes while removing waste as urine.",
+    },
+    {
+      id: "kidneys-2",
+      prompt: "About how much fluid do the kidneys filter daily?",
+      choices: [
+        "Roughly 180 L",
+        "Roughly 1.8 L only",
+        "Roughly 18 mL",
+        "None — the liver filters all fluid",
+      ],
+      correctIndex: 0,
+      explain: "They filter a huge volume, then reclaim most of it; only 1–2 L becomes urine.",
+    },
+    {
+      id: "kidneys-3",
+      prompt: "What carries urine away from a kidney?",
+      choices: [
+        "Ureter",
+        "Bronchus",
+        "Coronary artery",
+        "Optic nerve",
+      ],
+      correctIndex: 0,
+      explain: "Each ureter connects a kidney to the bladder.",
+    },
+    {
+      id: "kidneys-4",
+      prompt: "Where do the kidneys sit?",
+      choices: [
+        "Either side of the spine below the ribs",
+        "Inside the eyeball",
+        "On top of the heart",
+        "Only in the left foot",
+      ],
+      correctIndex: 0,
+      explain: "They are retroperitoneal organs flanking the spine.",
+    },
+    {
+      id: "kidneys-5",
+      prompt: "What is the renal cortex?",
+      choices: [
+        "The outer filtering layer of the kidney",
+        "A chamber of the heart",
+        "A lobe of the lung",
+        "The clear front of the eye",
+      ],
+      correctIndex: 0,
+      explain: "Nephron filtration begins in the cortex.",
+    },
+  ],
+  eyeball: [
+    {
+      id: "eye-1",
+      prompt: "What is the eye’s main job?",
+      choices: [
+        "Capture and focus light for vision",
+        "Filter blood into urine",
+        "Pump oxygenated blood",
+        "Produce insulin",
+      ],
+      correctIndex: 0,
+      explain: "Optics focus light; the retina turns it into neural signals.",
+    },
+    {
+      id: "eye-2",
+      prompt: "What does the iris control?",
+      choices: [
+        "How much light enters the eye",
+        "Heart rate",
+        "Blood filtration rate",
+        "Bile release",
+      ],
+      correctIndex: 0,
+      explain: "The iris adjusts pupil size like a camera aperture.",
+    },
+    {
+      id: "eye-3",
+      prompt: "Which structure carries visual signals toward the brain?",
+      choices: [
+        "Optic nerve",
+        "Ureter",
+        "Trachea",
+        "Portal vein",
+      ],
+      correctIndex: 0,
+      explain: "The optic nerve is a cable of axons from the retina.",
+    },
+    {
+      id: "eye-4",
+      prompt: "Why is the cornea unusual among tissues?",
+      choices: [
+        "It has no blood vessels and takes oxygen from air",
+        "It pumps blood",
+        "It filters urine",
+        "It stores marrow",
+      ],
+      correctIndex: 0,
+      explain: "Clarity requires an avascular cornea that gets oxygen from the tear film/air.",
+    },
+    {
+      id: "eye-5",
+      prompt: "Where does the eye sit?",
+      choices: [
+        "Within the bony orbit",
+        "Inside the liver",
+        "Behind the pancreas",
+        "In the knee joint",
+      ],
+      correctIndex: 0,
+      explain: "The orbit is the bony socket that protects the globe.",
+    },
+  ],
+  intestine: [
+    {
+      id: "intestine-1",
+      prompt: "What is a core job of the intestine?",
+      choices: [
+        "Digestion and nutrient absorption",
+        "Beating to move blood",
+        "Focusing light",
+        "Making cerebrospinal fluid only",
+      ],
+      correctIndex: 0,
+      explain: "Food is broken down further and nutrients cross into blood/lymph.",
+    },
+    {
+      id: "intestine-2",
+      prompt: "Which segment is the first part of the small intestine?",
+      choices: [
+        "Duodenum",
+        "Cornea",
+        "Aorta",
+        "Epidermis",
+      ],
+      correctIndex: 0,
+      explain: "The duodenum receives chyme from the stomach and digestive juices.",
+    },
+    {
+      id: "intestine-3",
+      prompt: "What does the colon mainly reclaim?",
+      choices: [
+        "Water",
+        "Oxygen from air",
+        "Light photons",
+        "Red blood cells from marrow",
+      ],
+      correctIndex: 0,
+      explain: "The large intestine absorbs water and forms stool.",
+    },
+    {
+      id: "intestine-4",
+      prompt: "Why is intestinal surface area so large?",
+      choices: [
+        "Folds, villi, and microvilli amplify absorption",
+        "It has no lining cells",
+        "It is filled with bone",
+        "It never contacts food",
+      ],
+      correctIndex: 0,
+      explain: "Surface amplification is key for efficient nutrient uptake.",
+    },
+    {
+      id: "intestine-5",
+      prompt: "About how long is the intestine when extended?",
+      choices: [
+        "About 6–7 m",
+        "About 6–7 cm",
+        "About 60–70 km",
+        "About 24 mm",
+      ],
+      correctIndex: 0,
+      explain: "Stretched out, the gut tube is several metres long in adults.",
+    },
+  ],
+  pancreas: [
+    {
+      id: "pancreas-1",
+      prompt: "The pancreas is dual-purpose because it:",
+      choices: [
+        "Makes digestive enzymes and blood-sugar hormones",
+        "Only stores urine",
+        "Only pumps blood",
+        "Only senses light",
+      ],
+      correctIndex: 0,
+      explain: "Exocrine tissue makes enzymes; islets release insulin and glucagon.",
+    },
+    {
+      id: "pancreas-2",
+      prompt: "Where does the pancreas sit?",
+      choices: [
+        "Behind the stomach, across the upper abdomen",
+        "Inside the skull",
+        "In the palm of the hand",
+        "Around the ankle",
+      ],
+      correctIndex: 0,
+      explain: "It lies deep in the upper abdomen, crossing near the spine.",
+    },
+    {
+      id: "pancreas-3",
+      prompt: "Which hormone from the pancreas helps lower blood sugar?",
+      choices: [
+        "Insulin",
+        "Bile",
+        "Pepsin",
+        "Melanin",
+      ],
+      correctIndex: 0,
+      explain: "Insulin helps cells take up glucose from the blood.",
+    },
+    {
+      id: "pancreas-4",
+      prompt: "The head of the pancreas is cradled by the:",
+      choices: [
+        "Duodenum",
+        "Left atrium",
+        "Cornea",
+        "Trachea",
+      ],
+      correctIndex: 0,
+      explain: "Anatomically, the duodenal curve wraps the pancreatic head.",
+    },
+    {
+      id: "pancreas-5",
+      prompt: "Most of the pancreas tissue is devoted to:",
+      choices: [
+        "Digestive enzyme production",
+        "Hearing",
+        "Vision",
+        "Making bone marrow",
+      ],
+      correctIndex: 0,
+      explain: "Only a small fraction is endocrine islets; most is exocrine.",
+    },
+  ],
+  skin: [
+    {
+      id: "skin-1",
+      prompt: "What are key jobs of the skin?",
+      choices: [
+        "Protect, sense, and help control temperature",
+        "Filter all blood into urine",
+        "Pump blood to the lungs",
+        "Store long-term memories",
+      ],
+      correctIndex: 0,
+      explain: "Skin is a barrier, a sensor, and part of thermoregulation.",
+    },
+    {
+      id: "skin-2",
+      prompt: "Which is the outer protective layer?",
+      choices: [
+        "Epidermis",
+        "Myocardium",
+        "Alveolus",
+        "Nephron",
+      ],
+      correctIndex: 0,
+      explain: "The epidermis is the outermost skin layer.",
+    },
+    {
+      id: "skin-3",
+      prompt: "About how large is adult skin if spread flat?",
+      choices: [
+        "About 2 m²",
+        "About 2 cm²",
+        "About 200 m²",
+        "About 24 mm²",
+      ],
+      correctIndex: 0,
+      explain: "Skin is often called the body’s largest organ by surface area.",
+    },
+    {
+      id: "skin-4",
+      prompt: "What does the dermis mainly contain?",
+      choices: [
+        "Nerves, vessels, and glands",
+        "Only bone marrow",
+        "Only alveoli",
+        "Only heart valves",
+      ],
+      correctIndex: 0,
+      explain: "The dermis holds connective tissue, vessels, nerves, and skin appendages.",
+    },
+    {
+      id: "skin-5",
+      prompt: "What is a fair everyday tip for skin health?",
+      choices: [
+        "Gentle cleansing, moisturizer, and sunscreen",
+        "Never drink water",
+        "Avoid all sleep",
+        "Scratch until bleeding daily",
+      ],
+      correctIndex: 0,
+      explain: "Protecting the barrier and limiting UV damage keeps skin healthier.",
+    },
+  ],
+};
+
+export function quizForOrgan(organId: OrganId): OrganQuiz {
+  return { organId, questions: QUIZZES[organId] };
+}
+
+export const QUIZ_LENGTH = 5;
