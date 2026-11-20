@@ -65,7 +65,6 @@ export function OrganAnimationPlayer({ organ }: Props) {
         ref={videoRef}
         key={organ.id}
         className="animation-modal-video"
-        controls
         playsInline
         preload="auto"
         poster={organ.illustrated ? `/anatomy/${organ.id}/organ.webp` : undefined}
