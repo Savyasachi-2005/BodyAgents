@@ -915,6 +915,11 @@ button.organ-card-image:focus-visible { outline: 2px solid #8b6fc4; outline-offs
 }
 
 .quiz-options { display: flex; flex-direction: column; gap: 8px; text-align: left; }
+.quiz-options [role="radiogroup"] {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
 .quiz-options > p {
   margin: 0 0 4px;
   color: var(--ink);
@@ -939,6 +944,9 @@ button.organ-card-image:focus-visible { outline: 2px solid #8b6fc4; outline-offs
   transform: translateY(-1px);
 }
 .quiz-options button:disabled { cursor: default; transform: none; }
+.quiz-options button:focus-visible,
+.quiz-next:focus-visible,
+.quiz-result-actions .lesson-button:focus-visible { outline: 3px solid color-mix(in srgb, var(--item-accent, var(--coral)) 45%, white); outline-offset: 2px; }
 .quiz-options button.correct { border-color: color-mix(in srgb, var(--sage) 55%, var(--line)); background: rgba(118, 157, 116, 0.14); }
 .quiz-options button.wrong { border-color: color-mix(in srgb, var(--coral) 55%, var(--line)); background: rgba(235, 124, 107, 0.12); }
 .quiz-choice-index {
@@ -1102,6 +1110,7 @@ button.organ-card-image:focus-visible { outline: 2px solid #8b6fc4; outline-offs
 }
 
 .quiz-score-line { margin: 4px 0 10px; font: 500 16px/1.4 var(--font-serif), serif; }
+.quiz-score-line span { color: var(--muted); font-size: 12px; }
 .quiz-reward-row {
   display: flex;
   flex-wrap: wrap;
@@ -1138,6 +1147,26 @@ button.organ-card-image:focus-visible { outline: 2px solid #8b6fc4; outline-offs
 .quiz-new-badges b { display: block; font: 500 14px var(--font-serif), serif; }
 .quiz-new-badges span { display: block; margin-top: 2px; color: var(--muted); font: 500 11px var(--font-sans), sans-serif; }
 .quiz-keep-going { color: var(--muted); font: 500 13px/1.4 var(--font-serif), serif; }
+.quiz-mistakes {
+  margin: 0 auto 16px;
+  max-width: 430px;
+  text-align: left;
+}
+.quiz-mistakes h4 { margin: 0 0 8px; font: 500 15px var(--font-serif), serif; }
+.quiz-mistakes article {
+  display: grid;
+  gap: 4px;
+  margin-top: 8px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--coral) 35%, var(--line));
+  border-radius: 12px;
+  background: rgba(255, 252, 247, 0.95);
+  font: 500 11px/1.35 var(--font-sans), sans-serif;
+}
+.quiz-mistakes article b { font: 500 13px/1.3 var(--font-serif), serif; }
+.quiz-mistakes article span:first-of-type { color: var(--coral); }
+.quiz-mistakes article span:nth-of-type(2) { color: var(--sage); }
+.quiz-mistakes article p { margin: 3px 0 0; color: var(--muted); }
 .quiz-result-actions {
   display: flex;
   flex-wrap: wrap;

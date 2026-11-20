@@ -37,6 +37,7 @@ export type QuizResultDelta = {
   xpEarned: number;
   coinsEarned: number;
   stars: OrganStar;
+  previousBest: number | null;
   newBadges: BadgeId[];
   progress: QuizProgress;
 };
@@ -102,11 +103,14 @@ export function loadProgress(userId: string | null | undefined): QuizProgress | 
 
 export function applyQuizResult(userId: string, result: QuizResultApply): QuizResultDelta {
   const current = loadProgress(userId) ?? emptyProgress(userId);
-  const xpFromAnswers = result.correctCount * 10;
-  const coinsFromAnswers = result.correctCount * 1;
+  const previousBest = current.bestScores[result.organId] ?? null;
+  const improvedAnswers = Math.max(0, result.correctCount - (previousBest ?? 0));
+  const xpFromAnswers = improvedAnswers * 10;
+  const coinsFromAnswers = improvedAnswers;
   const perfect = result.correctCount === result.total && result.total > 0;
-  const xpBonus = perfect ? 15 : 0;
-  const coinBonus = perfect ? 3 : 0;
+  const earnedPerfectBonus = perfect && previousBest !== result.total;
+  const xpBonus = earnedPerfectBonus ? 15 : 0;
+  const coinBonus = earnedPerfectBonus ? 3 : 0;
   const xpEarned = xpFromAnswers + xpBonus;
   const coinsEarned = coinsFromAnswers + coinBonus;
   const stars = starsForScore(result.correctCount, result.total);
@@ -158,7 +162,7 @@ export function applyQuizResult(userId: string, result: QuizResultApply): QuizRe
   const others = readAll().filter((row) => row.userId !== userId);
   writeAll([progress, ...others]);
 
-  return { xpEarned, coinsEarned, stars: nextStars, newBadges, progress };
+  return { xpEarned, coinsEarned, stars, previousBest, newBadges, progress };
 }
 
 export function subscribeQuizProgress(handler: () => void): () => void {

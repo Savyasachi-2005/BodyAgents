@@ -1,4 +1,4 @@
-import type { OrganId } from "./anatomy-data";
+import { organs, type OrganId } from "./anatomy-data";
 
 export type QuizQuestion = {
   id: string;
@@ -637,7 +637,151 @@ const QUIZZES: Record<OrganId, QuizQuestion[]> = {
 };
 
 export function quizForOrgan(organId: OrganId): OrganQuiz {
-  return { organId, questions: QUIZZES[organId] };
+  return { organId, questions: buildQuizBank(organId) };
 }
 
 export const QUIZ_LENGTH = 5;
+
+const QUIZ_BANK_SIZE = 50;
+
+function uniqueChoices(correct: string, values: string[]): [string, string, string, string] {
+  const pool = values
+    .filter((value) => value !== correct)
+    .filter((value, index, all) => all.indexOf(value) === index);
+
+  const wrong = pool.slice(0, 3);
+  while (wrong.length < 3) wrong.push("Not applicable to this organ");
+  return [correct, wrong[0], wrong[1], wrong[2]];
+}
+
+function buildQuizBank(organId: OrganId): QuizQuestion[] {
+  const organ = organs.find((item) => item.id === organId);
+  if (!organ) return QUIZZES[organId];
+
+  const bank = [...QUIZZES[organId]];
+  const topics = [
+    {
+      correct: organ.system,
+      values: organs.map((item) => item.system),
+      prompts: [
+        `Which body system does the ${organ.name.toLowerCase()} belong to?`,
+        `The ${organ.name} is part of which system?`,
+        `Name the system associated with the ${organ.name.toLowerCase()}.`,
+        `Which system primarily contains the ${organ.name.toLowerCase()}?`,
+        `Where in the body-system organization is the ${organ.name.toLowerCase()} classified?`,
+      ],
+      explain: `The ${organ.name} belongs to the ${organ.system} system.`,
+    },
+    {
+      correct: organ.location,
+      values: organs.map((item) => item.location),
+      prompts: [
+        `Where is the ${organ.name.toLowerCase()} located?`,
+        `Which location describes the ${organ.name.toLowerCase()}?`,
+        `Choose the correct anatomical location of the ${organ.name.toLowerCase()}.`,
+        `The ${organ.name.toLowerCase()} is positioned where?`,
+        `Identify the ${organ.name.toLowerCase()}’s main location.`,
+      ],
+      explain: `The ${organ.name} is located ${organ.location.toLowerCase()}.`,
+    },
+    {
+      correct: organ.function,
+      values: organs.map((item) => item.function),
+      prompts: [
+        `What is a primary function of the ${organ.name.toLowerCase()}?`,
+        `Which statement describes the ${organ.name.toLowerCase()}’s main role?`,
+        `Choose the main action performed by the ${organ.name.toLowerCase()}.`,
+        `Which function is associated with the ${organ.name.toLowerCase()}?`,
+        `What does the ${organ.name.toLowerCase()} primarily help the body do?`,
+      ],
+      explain: `A primary function of the ${organ.name} is ${organ.function.toLowerCase()}.`,
+    },
+    {
+      correct: organ.size,
+      values: organs.map((item) => item.size),
+      prompts: [
+        `Which description gives the ${organ.name.toLowerCase()}’s size?`,
+        `Choose the typical size of the ${organ.name.toLowerCase()}.`,
+        `How is the ${organ.name.toLowerCase()} commonly sized?`,
+        `Which size comparison applies to the ${organ.name.toLowerCase()}?`,
+        `Identify the typical size description for the ${organ.name.toLowerCase()}.`,
+      ],
+      explain: `The ${organ.name} is commonly described as ${organ.size.toLowerCase()}.`,
+    },
+    {
+      correct: organ.weight,
+      values: organs.map((item) => item.weight),
+      prompts: [
+        `Which weight range is associated with the ${organ.name.toLowerCase()}?`,
+        `Choose the typical weight of the ${organ.name.toLowerCase()}.`,
+        `How heavy is the ${organ.name.toLowerCase()} commonly described as?`,
+        `Identify the correct weight information for the ${organ.name.toLowerCase()}.`,
+        `Which value is closest to the ${organ.name.toLowerCase()}’s typical weight?`,
+      ],
+      explain: `The typical weight given for the ${organ.name} is ${organ.weight}.`,
+    },
+    {
+      correct: organ.tissue,
+      values: organs.map((item) => item.tissue),
+      prompts: [
+        `Which tissue description applies to the ${organ.name.toLowerCase()}?`,
+        `Choose the tissue characteristic of the ${organ.name.toLowerCase()}.`,
+        `What tissue type mainly makes up the ${organ.name.toLowerCase()}?`,
+        `Which statement describes the ${organ.name.toLowerCase()} tissue?`,
+        `Identify the main tissue feature of the ${organ.name.toLowerCase()}.`,
+      ],
+      explain: `The ${organ.name} is mainly characterized by ${organ.tissue.toLowerCase()}.`,
+    },
+    {
+      correct: organ.bloodSupply,
+      values: organs.map((item) => item.bloodSupply),
+      prompts: [
+        `Which blood supply description belongs to the ${organ.name.toLowerCase()}?`,
+        `Choose the main blood supply for the ${organ.name.toLowerCase()}.`,
+        `How is blood supplied to the ${organ.name.toLowerCase()}?`,
+        `Identify the vascular supply associated with the ${organ.name.toLowerCase()}.`,
+        `Which vessel or supply is related to the ${organ.name.toLowerCase()}?`,
+      ],
+      explain: `The ${organ.name}’s blood supply is described as ${organ.bloodSupply.toLowerCase()}.`,
+    },
+    {
+      correct: organ.comparison,
+      values: organs.map((item) => item.comparison),
+      prompts: [
+        `Which comparison describes the ${organ.name.toLowerCase()}?`,
+        `Choose the familiar comparison for the ${organ.name.toLowerCase()}.`,
+        `Which everyday comparison is used for the ${organ.name.toLowerCase()}?`,
+        `Identify the comparison associated with the ${organ.name.toLowerCase()}.`,
+        `What is the ${organ.name.toLowerCase()} commonly compared with?`,
+      ],
+      explain: `The ${organ.name} is often compared to ${organ.comparison.toLowerCase()}.`,
+    },
+    {
+      correct: organ.dailyFact,
+      values: organs.map((item) => item.dailyFact),
+      prompts: [
+        `Which fact is associated with the ${organ.name.toLowerCase()}?`,
+        `Choose a key daily fact about the ${organ.name.toLowerCase()}.`,
+        `What remarkable everyday fact describes the ${organ.name.toLowerCase()}?`,
+        `Identify the correct daily fact for the ${organ.name.toLowerCase()}.`,
+        `Which statement is a notable fact about the ${organ.name.toLowerCase()}?`,
+      ],
+      explain: `${organ.name}: ${organ.dailyFact}.`,
+    },
+  ] as const;
+
+  topics.forEach((topic, topicIndex) => {
+    topic.prompts.forEach((prompt, variantIndex) => {
+      const choices = uniqueChoices(topic.correct, [...topic.values]);
+      bank.push({
+        id: `${organId}-${topicIndex + 6}-${variantIndex + 1}`,
+        prompt,
+        choices,
+        correctIndex: 0,
+        explain: topic.explain,
+      });
+    });
+  });
+
+  return bank.slice(0, QUIZ_BANK_SIZE);
+}
