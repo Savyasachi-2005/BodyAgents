@@ -79,7 +79,7 @@ export function LibraryView({ query, onSelectOrgan, onOpenLesson }: Props) {
               <div className="library-entry-copy">
                 <div className="library-entry-badges">
                   <em>{organ.system}</em>
-                  {organ.lessonVideoUrl ? (
+                  {organ.lessonVideoSrc ? (
                     <span className="library-video-badge"><Video size={12} /> Video</span>
                   ) : null}
                 </div>

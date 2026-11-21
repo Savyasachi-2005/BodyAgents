@@ -1,6 +1,8 @@
 @import "tailwindcss";
 
 :root {
+  --font-sans: "DM Sans", "Segoe UI", Arial, sans-serif;
+  --font-serif: "Cormorant Garamond", Georgia, "Times New Roman", serif;
   --ink: #2f2a27;
   --muted: #8d847c;
   --canvas: #f7f0e7;
@@ -1850,19 +1852,6 @@ button.organ-card-image:focus-visible { outline: 2px solid #8b6fc4; outline-offs
   font: 500 10px var(--font-sans), sans-serif;
 }
 
-.lesson-video-head a {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  color: var(--coral);
-  text-decoration: none;
-  font: 500 12px var(--font-sans), sans-serif;
-}
-
-.lesson-video-head a:hover {
-  text-decoration: underline;
-}
-
 .lesson-video-frame {
   position: relative;
   width: 100%;
@@ -1873,7 +1862,7 @@ button.organ-card-image:focus-visible { outline: 2px solid #8b6fc4; outline-offs
   background: #1a1614;
 }
 
-.lesson-video-frame iframe {
+.lesson-video-frame video {
   position: absolute;
   inset: 0;
   width: 100%;

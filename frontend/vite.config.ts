@@ -46,7 +46,8 @@ export default defineConfig(async () => {
   return {
     envDir: "..",
     server: {
-      port: 3001,
+      port: 3000,
+      strictPort: true,
       ...(isCodexSeatbeltSandbox
         ? { watch: { useFsEvents: false, usePolling: true } }
         : {}),

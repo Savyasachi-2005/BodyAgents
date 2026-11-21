@@ -6,7 +6,6 @@ import {
   BookOpen,
   CircleHelp,
   Droplets,
-  ExternalLink,
   HandHeart,
   MapPin,
   Ruler,
@@ -15,7 +14,7 @@ import {
   Stethoscope,
   Video,
 } from "lucide-react";
-import { organLessons, youtubeEmbedSrc, type OrganId } from "../lib/anatomy-data";
+import { organLessons, type OrganId } from "../lib/anatomy-data";
 import { OrganArt } from "./OrganArt";
 
 type Props = {
@@ -36,8 +35,7 @@ export function LessonsView({ focusOrganId, onSelectOrgan, onTakeQuiz }: Props) 
   if (!active) return null;
 
   const { organ } = active;
-  const videoUrl = organ.lessonVideoUrl?.trim() || "";
-  const embedSrc = videoUrl ? youtubeEmbedSrc(videoUrl) : null;
+  const videoSrc = organ.lessonVideoSrc?.trim() || "";
   const conditions = organ.conditions.slice(0, 5);
 
   return (
@@ -67,7 +65,7 @@ export function LessonsView({ focusOrganId, onSelectOrgan, onTakeQuiz }: Props) 
                 <b>{lesson.organ.name}</b>
                 <small>
                   {lesson.organ.system}
-                  {lesson.organ.lessonVideoUrl ? " · Video" : ""}
+                  {lesson.organ.lessonVideoSrc ? " · Video" : ""}
                 </small>
               </span>
             </button>
@@ -155,23 +153,19 @@ export function LessonsView({ focusOrganId, onSelectOrgan, onTakeQuiz }: Props) 
             </ul>
           </div>
 
-          {embedSrc ? (
+          {videoSrc ? (
             <div className="lesson-video">
               <div className="lesson-video-head">
                 <em><Video size={15} /> Watch the lesson</em>
-                <a href={videoUrl} target="_blank" rel="noopener noreferrer">
-                  Open on YouTube <ExternalLink size={13} />
-                </a>
               </div>
               <div className="lesson-video-frame">
-                <iframe
+                <video
                   key={organ.id}
-                  src={embedSrc}
+                  src={videoSrc}
                   title={`${organ.name} lesson video`}
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                  allowFullScreen
-                  loading="lazy"
-                  referrerPolicy="strict-origin-when-cross-origin"
+                  controls
+                  playsInline
+                  preload="metadata"
                 />
               </div>
             </div>

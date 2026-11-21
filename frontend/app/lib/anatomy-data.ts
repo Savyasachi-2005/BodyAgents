@@ -49,37 +49,13 @@ export type Organ = {
   /** Whether `/anatomy/<id>/*.webp` illustrations exist. Organs without them
    *  fall back to the accent glyph rather than a broken image. */
   illustrated: boolean;
-  /** Optional YouTube watch/share URL for the Lessons workspace player. */
-  lessonVideoUrl?: string;
+  /** Optional local MP4 shown in the Lessons workspace player. */
+  lessonVideoSrc?: string;
 };
 
 /** Public path for the Animate modal function video (`/animations/<id>.mp4`). */
 export function organAnimationSrc(organId: OrganId): string {
   return `/animations/${organId}.mp4`;
-}
-
-/** Turn a YouTube watch/share/embed URL into a privacy-enhanced embed src. */
-export function youtubeEmbedSrc(url: string): string | null {
-  try {
-    const parsed = new URL(url.trim());
-    const host = parsed.hostname.replace(/^www\./, "");
-    let id = "";
-    if (host === "youtu.be") {
-      id = parsed.pathname.split("/").filter(Boolean)[0] ?? "";
-    } else if (host === "youtube.com" || host === "m.youtube.com" || host === "youtube-nocookie.com") {
-      if (parsed.pathname.startsWith("/embed/")) {
-        id = parsed.pathname.split("/")[2] ?? "";
-      } else if (parsed.pathname.startsWith("/shorts/")) {
-        id = parsed.pathname.split("/")[2] ?? "";
-      } else {
-        id = parsed.searchParams.get("v") ?? "";
-      }
-    }
-    if (!id || !/^[a-zA-Z0-9_-]{6,}$/.test(id)) return null;
-    return `https://www.youtube-nocookie.com/embed/${id}?rel=0`;
-  } catch {
-    return null;
-  }
 }
 
 export const organs: Organ[] = [
@@ -105,7 +81,7 @@ export const organs: Organ[] = [
     comparison: "Heart vs. brain",
     conditions: ["Coronary artery disease", "Arrhythmia", "Heart valve disorders", "Heart failure", "Cardiomyopathy", "Myocarditis", "Atrial fibrillation", "Congenital heart defects"],
     illustrated: true,
-    lessonVideoUrl: "https://youtu.be/mC9tYJjmvYQ",
+    lessonVideoSrc: "/Videos/Heart.mp4",
     hotspots: [
       { id: "aorta", label: "Aorta", detail: "Main artery", position: [-0.35, 1.65, 0.55], color: "#ee7c6a" },
       { id: "left-atrium", label: "Left Atrium", detail: "Receives oxygenated blood", position: [0.82, 0.65, 0.5], color: "#f2a33b" },
@@ -137,7 +113,7 @@ export const organs: Organ[] = [
     comparison: "Brain vs. eye",
     conditions: ["Migraine", "Stroke", "Neurodegenerative disease", "Epilepsy", "Traumatic brain injury", "Meningitis", "Multiple sclerosis", "Brain aneurysm"],
     illustrated: true,
-    lessonVideoUrl: "https://youtu.be/6wkcdMasbIY",
+    lessonVideoSrc: "/Videos/Brain.mp4",
     hotspots: [
       { id: "frontal", label: "Frontal Lobe", detail: "Planning & movement", position: [-0.7, 0.65, 0.8], color: "#ee7c6a" },
       { id: "parietal", label: "Parietal Lobe", detail: "Sensory integration", position: [0.15, 1.1, 0.65], color: "#f2a33b" },
@@ -167,7 +143,7 @@ export const organs: Organ[] = [
     comparison: "Lungs vs. heart",
     conditions: ["Asthma", "COPD", "Pneumonia", "Pulmonary embolism", "Pulmonary fibrosis", "Bronchitis", "Cystic fibrosis", "Lung cancer"],
     illustrated: true,
-    lessonVideoUrl: "https://youtu.be/EGvIyhiNohk",
+    lessonVideoSrc: "/Videos/Lungs.mp4",
     hotspots: [
       { id: "trachea", label: "Trachea", detail: "Carries air to the lungs", position: [0, 1.6, 0.2], color: "#6393d8" },
       { id: "right-lung", label: "Right Lung", detail: "Three lobes", position: [-1.2, 0.1, 0.7], color: "#ee7c6a" },
@@ -200,7 +176,7 @@ export const organs: Organ[] = [
     comparison: "Bones vs. muscles",
     conditions: ["Fracture", "Osteoporosis", "Rickets", "Osteoarthritis", "Scoliosis", "Bone infection", "Stress fracture", "Growth plate injury"],
     illustrated: false,
-    lessonVideoUrl: "https://youtu.be/m9N5HMqT1RM",
+    lessonVideoSrc: "/Videos/Skeleton.mp4",
     hotspots: [],
   },
   {
@@ -225,7 +201,7 @@ export const organs: Organ[] = [
     comparison: "Liver vs. intestine",
     conditions: ["Fatty liver disease", "Hepatitis", "Cirrhosis", "Gallstones", "Haemochromatosis", "Liver cancer", "Autoimmune hepatitis", "Portal hypertension"],
     illustrated: true,
-    lessonVideoUrl: "https://youtu.be/E9zTnGxLZ_s",
+    lessonVideoSrc: "/Videos/Liver.mp4",
     hotspots: [
       { id: "right-lobe", label: "Right Lobe", detail: "Largest hepatic lobe", position: [-0.75, 0.35, 0.75], color: "#ee7c6a" },
       { id: "left-lobe", label: "Left Lobe", detail: "Crosses the midline", position: [0.85, 0.25, 0.75], color: "#f2a33b" },
@@ -254,7 +230,7 @@ export const organs: Organ[] = [
     comparison: "Kidneys vs. liver",
     conditions: ["Kidney stones", "Chronic kidney disease", "Urinary infection", "Glomerulonephritis", "Polycystic kidney disease", "Renal hypertension", "Acute kidney injury", "Nephrotic syndrome"],
     illustrated: true,
-    lessonVideoUrl: "https://youtu.be/eWf2wawKnZA",
+    lessonVideoSrc: "/Videos/Kidney.mp4",
     hotspots: [
       { id: "cortex", label: "Renal Cortex", detail: "Outer filtering layer", position: [-0.9, 0.55, 0.7], color: "#ee7c6a" },
       { id: "medulla", label: "Renal Medulla", detail: "Concentrates urine", position: [0.85, 0.2, 0.7], color: "#f2a33b" },
@@ -283,7 +259,7 @@ export const organs: Organ[] = [
     comparison: "Eye vs. brain",
     conditions: ["Myopia", "Cataract", "Glaucoma", "Macular degeneration", "Retinal detachment", "Dry eye disease", "Astigmatism", "Conjunctivitis"],
     illustrated: true,
-    lessonVideoUrl: "https://youtu.be/GmaJYcu5PCo",
+    lessonVideoSrc: "/Videos/Eye.mp4",
     hotspots: [
       { id: "cornea", label: "Cornea", detail: "Clear focusing surface", position: [-0.94, 0.05, 1.47], color: "#6393d8" },
       { id: "iris", label: "Iris", detail: "Controls light entry", position: [-1.22, -0.53, 1.15], color: "#f2a33b" },
@@ -312,7 +288,7 @@ export const organs: Organ[] = [
     comparison: "Intestine vs. liver",
     conditions: ["Irritable bowel syndrome", "Inflammatory bowel disease", "Celiac disease", "Diverticulitis", "Intestinal obstruction", "Colorectal polyps", "Crohn's disease", "Lactose intolerance"],
     illustrated: true,
-    lessonVideoUrl: "https://youtu.be/r3GVrC0SBTo",
+    lessonVideoSrc: "/Videos/Intestine.mp4",
     hotspots: [
       { id: "duodenum", label: "Duodenum", detail: "First small-intestine segment", position: [0.6, 0.8, 0.75], color: "#f2a33b" },
       { id: "jejunum", label: "Jejunum", detail: "Major absorption region", position: [-0.45, 0.1, 0.82], color: "#ee7c6a" },
@@ -341,7 +317,7 @@ export const organs: Organ[] = [
     comparison: "Pancreas vs. liver",
     conditions: ["Pancreatitis", "Type 1 diabetes", "Pancreatic cancer", "Type 2 diabetes", "Exocrine insufficiency", "Pancreatic cysts", "Gallstone pancreatitis", "Insulinoma"],
     illustrated: true,
-    lessonVideoUrl: "https://youtu.be/jwhw-C4uDPw",
+    lessonVideoSrc: "/Videos/Pancreas.mp4",
     hotspots: [
       { id: "head", label: "Head", detail: "Cradled by the duodenum", position: [-1.32, -0.36, 0.55], color: "#ee7c6a" },
       { id: "body", label: "Body", detail: "Crosses the spine", position: [0.05, 0.25, 0.45], color: "#f2a33b" },
@@ -371,7 +347,7 @@ export const organs: Organ[] = [
     comparison: "Skin vs. intestine",
     conditions: ["Eczema", "Psoriasis", "Melanoma", "Acne vulgaris", "Cellulitis", "Contact dermatitis", "Rosacea", "Vitiligo"],
     illustrated: true,
-    lessonVideoUrl: "https://youtu.be/CbXLyUdjsdo",
+    lessonVideoSrc: "/Videos/Skin.mp4",
     hotspots: [
       { id: "epidermis", label: "Epidermis", detail: "Outer protective layer", position: [-0.05, 0.88, 1.4], color: "#ee7c6a" },
       { id: "dermis", label: "Dermis", detail: "Nerves, vessels & glands", position: [0.29, 0.05, 1.4], color: "#f2a33b" },
