@@ -78,6 +78,22 @@ npm run dev
 
 Open http://localhost:3001
 
+## Docker
+
+Docker Compose runs the frontend and backend. MongoDB remains external because
+the app uses MongoDB Atlas Vector Search.
+
+```powershell
+Copy-Item .env.example .env
+# Set GROQ_API_KEY and MONGODB_URI in .env
+docker compose up --build
+```
+
+Open http://localhost:3000. The frontend API and WebSocket URLs are set at image
+build time using `NEXT_PUBLIC_API_URL` and `NEXT_PUBLIC_WS_URL` in `.env`; set
+these to the public backend URLs when building for deployment. Stop the
+containers with `docker compose down`.
+
 
 
 
