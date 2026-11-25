@@ -156,7 +156,8 @@ button:focus-visible, input:focus-visible, canvas:focus-visible {
 }
 .auth-user strong { display: block; color: var(--ink); font-size: 13px; }
 .auth-user small { display: block; font-size: 11px; opacity: 0.75; }
-.auth-logout {
+.auth-logout,
+.auth-admin {
   width: 100%;
   min-height: 36px;
   border: 1px solid var(--line);
@@ -168,6 +169,11 @@ button:focus-visible, input:focus-visible, canvas:focus-visible {
   justify-content: center;
   cursor: pointer;
   font-size: 12px;
+}
+.auth-admin {
+  margin-bottom: 8px;
+  background: rgba(111, 137, 192, 0.12);
+  color: #5f78ad;
 }
 .auth-tabs {
   display: grid;
@@ -2074,6 +2080,231 @@ button.organ-card-image:focus-visible { outline: 2px solid #8b6fc4; outline-offs
   .lesson-sheet-top { flex-direction: column-reverse; }
   .lesson-facts { grid-template-columns: 1fr; }
   .lesson-parts ul { grid-template-columns: 1fr; }
+}
+
+/* —— Admin overlay —— */
+.admin-panel {
+  width: min(920px, 100%);
+  max-height: min(90vh, 920px);
+  overflow: auto;
+  position: relative;
+  padding: 0 0 22px;
+  border: 1px solid var(--line);
+  border-radius: 26px;
+  background: #fffaf2;
+  box-shadow: 0 30px 90px rgba(63, 42, 28, 0.24);
+  text-align: left;
+  animation: modal-in 0.35s cubic-bezier(0.2, 0.85, 0.3, 1);
+}
+.admin-panel .modal-close { top: 14px; right: 14px; }
+.admin-hero {
+  padding: 28px 26px 16px;
+  background:
+    radial-gradient(circle at 88% 12%, rgba(111, 137, 192, 0.18), transparent 44%),
+    linear-gradient(160deg, #fff8ef, #fffaf2 60%);
+  border-bottom: 1px solid var(--line);
+}
+.admin-hero em {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  font: 500 10px var(--font-sans), sans-serif;
+}
+.admin-hero h2 {
+  margin: 8px 0 6px;
+  font: 500 30px/1.1 var(--font-serif), serif;
+}
+.admin-hero p {
+  margin: 0;
+  max-width: 48ch;
+  color: #6e655f;
+  font: 500 13px/1.4 var(--font-serif), serif;
+}
+.admin-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin: 14px 22px 0;
+}
+.admin-tabs button {
+  min-height: 38px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255, 252, 247, 0.9);
+  cursor: pointer;
+  font: 500 13px var(--font-serif), serif;
+}
+.admin-tabs button.active {
+  background: rgba(111, 137, 192, 0.16);
+  color: #5a739f;
+  border-color: rgba(111, 137, 192, 0.35);
+}
+.admin-error {
+  margin: 12px 22px 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(196, 84, 70, 0.1);
+  color: #a14538;
+  font-size: 12px;
+}
+.admin-body { margin: 14px 22px 0; }
+.admin-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: end;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.admin-toolbar label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.admin-toolbar select,
+.admin-question-card input,
+.admin-question-card textarea,
+.admin-inline-form input,
+.admin-inline-form select {
+  min-height: 36px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fffefb;
+  padding: 8px 10px;
+  font: 500 13px var(--font-serif), serif;
+  color: var(--ink);
+}
+.admin-question-card textarea { min-height: 64px; resize: vertical; }
+.admin-toolbar-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.admin-primary,
+.admin-secondary {
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.admin-primary {
+  background: linear-gradient(140deg, #6e88bd, #8ea4d4);
+  color: #fff;
+  border-color: transparent;
+}
+.admin-primary:disabled,
+.admin-secondary:disabled { opacity: 0.55; cursor: not-allowed; }
+.admin-secondary { background: rgba(255, 255, 255, 0.7); }
+.admin-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+.admin-question-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+.admin-question-card {
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: rgba(255, 252, 247, 0.95);
+  display: grid;
+  gap: 10px;
+}
+.admin-question-card label {
+  display: grid;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.admin-question-head {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 8px;
+  align-items: center;
+}
+.admin-choices {
+  display: grid;
+  gap: 8px;
+}
+.admin-choices label {
+  display: grid;
+  gap: 4px;
+  padding: 8px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+}
+.admin-choices label.correct {
+  border-color: rgba(111, 137, 192, 0.4);
+  background: rgba(111, 137, 192, 0.08);
+}
+.admin-icon-btn {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: transparent;
+  cursor: pointer;
+}
+.admin-table-wrap { overflow: auto; border: 1px solid var(--line); border-radius: 14px; }
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.admin-table th,
+.admin-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: middle;
+}
+.admin-table th {
+  background: rgba(255, 248, 239, 0.9);
+  color: var(--muted);
+  font: 500 10px var(--font-sans), sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.admin-table td strong { display: block; font: 500 13px var(--font-serif), serif; }
+.admin-table td small { display: block; color: var(--muted); margin-top: 2px; }
+.admin-table tr.inactive { opacity: 0.55; }
+.admin-pill {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.admin-pill.admin { background: rgba(111, 137, 192, 0.14); color: #5a739f; }
+.admin-row-actions { display: flex; gap: 6px; align-items: center; justify-content: flex-end; }
+.admin-inline-form {
+  display: grid;
+  grid-template-columns: 1.2fr 1.4fr auto auto auto;
+  gap: 8px;
+  align-items: center;
+}
+
+@media (max-width: 720px) {
+  .admin-inline-form { grid-template-columns: 1fr; }
+  .admin-tabs { grid-template-columns: 1fr; }
 }
 
 @media (prefers-reduced-motion: reduce) {

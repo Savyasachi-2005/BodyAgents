@@ -34,6 +34,23 @@ def initials_from_name(name: str) -> str:
     return (parts[0][0] + parts[-1][0]).upper()
 
 
+def serialize_user(user: dict[str, Any]) -> dict[str, Any]:
+    role = user.get("role") or "user"
+    if role not in {"user", "admin"}:
+        role = "user"
+    active = user.get("active")
+    if active is None:
+        active = True
+    return {
+        "id": str(user["_id"]),
+        "name": user["name"],
+        "email": user["email"],
+        "initials": initials_from_name(user["name"]),
+        "role": role,
+        "active": bool(active),
+    }
+
+
 async def create_user(name: str, email: str, password: str) -> dict[str, Any]:
     email_norm = email.strip().lower()
     users = get_db()[USERS]
@@ -50,15 +67,13 @@ async def create_user(name: str, email: str, password: str) -> dict[str, Any]:
         "email": email_norm,
         "salt": salt,
         "password_hash": password_hash,
+        "role": "user",
+        "active": True,
         "created_at": now,
     }
     result = await users.insert_one(doc)
-    return {
-        "id": str(result.inserted_id),
-        "name": doc["name"],
-        "email": doc["email"],
-        "initials": initials_from_name(doc["name"]),
-    }
+    doc["_id"] = result.inserted_id
+    return serialize_user(doc)
 
 
 async def authenticate(email: str, password: str) -> dict[str, Any]:
@@ -66,12 +81,9 @@ async def authenticate(email: str, password: str) -> dict[str, Any]:
     user = await get_db()[USERS].find_one({"email": email_norm})
     if not user or not verify_password(password, user["salt"], user["password_hash"]):
         raise ValueError("Invalid email or password")
-    return {
-        "id": str(user["_id"]),
-        "name": user["name"],
-        "email": user["email"],
-        "initials": initials_from_name(user["name"]),
-    }
+    if user.get("active") is False:
+        raise ValueError("Account is disabled")
+    return serialize_user(user)
 
 
 async def create_session(user_id: str) -> str:
@@ -104,12 +116,10 @@ async def get_user_by_token(token: str | None) -> dict[str, Any] | None:
     user = await get_db()[USERS].find_one({"_id": ObjectId(session["user_id"])})
     if not user:
         return None
-    return {
-        "id": str(user["_id"]),
-        "name": user["name"],
-        "email": user["email"],
-        "initials": initials_from_name(user["name"]),
-    }
+    if user.get("active") is False:
+        await get_db()[AUTH_SESSIONS].delete_one({"token": token})
+        return None
+    return serialize_user(user)
 
 
 async def delete_session(token: str | None) -> None:

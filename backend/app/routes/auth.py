@@ -4,6 +4,7 @@ from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel, EmailStr, Field
 
 from app.auth import authenticate, create_session, create_user, delete_session, get_user_by_token
+from app.deps import bearer_token
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
@@ -46,7 +47,7 @@ async def login(body: LoginBody) -> AuthResponse:
 
 @router.get("/me")
 async def me(authorization: str | None = Header(default=None)) -> dict:
-    token = _bearer(authorization)
+    token = bearer_token(authorization)
     user = await get_user_by_token(token)
     if not user:
         raise HTTPException(status_code=401, detail="Not authenticated")
@@ -55,14 +56,5 @@ async def me(authorization: str | None = Header(default=None)) -> dict:
 
 @router.post("/logout")
 async def logout(authorization: str | None = Header(default=None)) -> dict[str, str]:
-    await delete_session(_bearer(authorization))
+    await delete_session(bearer_token(authorization))
     return {"status": "ok"}
-
-
-def _bearer(authorization: str | None) -> str | None:
-    if not authorization:
-        return None
-    parts = authorization.split(" ", 1)
-    if len(parts) == 2 and parts[0].lower() == "bearer":
-        return parts[1].strip()
-    return authorization.strip()

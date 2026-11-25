@@ -12,7 +12,12 @@ from app.agents.philosopher import stream_reply
 from app.config import get_settings
 from app.memory.db import close_client, ensure_indexes, get_client
 from app.personas import known_persona_ids
+from app.routes.admin import router as admin_router
 from app.routes.auth import router as auth_router
+from app.routes.notes import router as notes_router
+from app.routes.quiz import router as quiz_router
+from app.routes.chat import router as chat_router
+from app.routes.migrate import router as migrate_router
 from app.ws.manager import manager
 
 logger = logging.getLogger(__name__)
@@ -53,6 +58,11 @@ app.add_middleware(
 )
 
 app.include_router(auth_router)
+app.include_router(notes_router)
+app.include_router(quiz_router)
+app.include_router(chat_router)
+app.include_router(migrate_router)
+app.include_router(admin_router)
 
 
 @app.get("/api/v1/health")

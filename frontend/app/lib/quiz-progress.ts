@@ -1,5 +1,5 @@
 import type { OrganId } from "./anatomy-data";
-import { organs } from "./anatomy-data";
+import { apiFetch } from "./api-client";
 
 export type OrganStar = 0 | 1 | 2 | 3;
 
@@ -42,10 +42,16 @@ export type QuizResultDelta = {
   progress: QuizProgress;
 };
 
-const STORAGE_KEY = "bodyagents_quiz_progress";
 const EVENT = "bodyagents:quiz-progress-changed";
+const LOCAL_KEY = "bodyagents_quiz_progress";
 
-function emptyProgress(userId: string): QuizProgress {
+function emitChanged(): void {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent(EVENT));
+  }
+}
+
+export function emptyProgress(userId: string): QuizProgress {
   return {
     userId,
     xp: 0,
@@ -58,118 +64,53 @@ function emptyProgress(userId: string): QuizProgress {
   };
 }
 
-function readAll(): QuizProgress[] {
-  if (typeof window === "undefined") return [];
+/** Legacy local rows for one-time migrate. */
+export function readLocalProgress(userId: string): QuizProgress | null {
+  if (typeof window === "undefined") return null;
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
+    const raw = localStorage.getItem(LOCAL_KEY);
+    if (!raw) return null;
     const parsed = JSON.parse(raw) as QuizProgress[];
-    return Array.isArray(parsed) ? parsed : [];
+    if (!Array.isArray(parsed)) return null;
+    return parsed.find((row) => row.userId === userId) ?? null;
   } catch {
-    return [];
+    return null;
   }
 }
 
-function writeAll(rows: QuizProgress[]): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(rows));
-  window.dispatchEvent(new CustomEvent(EVENT));
+export function clearLocalProgress(): void {
+  if (typeof window === "undefined") return;
+  localStorage.removeItem(LOCAL_KEY);
 }
 
-function todayKey(date = new Date()): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
-
-function daysBetween(a: string, b: string): number {
-  const aDate = new Date(`${a}T12:00:00`);
-  const bDate = new Date(`${b}T12:00:00`);
-  return Math.round((bDate.getTime() - aDate.getTime()) / 86_400_000);
-}
-
-export function starsForScore(correct: number, total: number): OrganStar {
-  if (total <= 0) return 0;
-  if (correct >= total) return 3;
-  if (correct >= total - 1) return 2;
-  if (correct >= Math.ceil(total * 0.6)) return 1;
-  return 0;
-}
-
-export function loadProgress(userId: string | null | undefined): QuizProgress | null {
+export async function loadProgress(userId: string | null | undefined): Promise<QuizProgress | null> {
   if (!userId) return null;
-  return readAll().find((row) => row.userId === userId) ?? emptyProgress(userId);
+  const data = await apiFetch<{ progress: QuizProgress }>("/api/v1/quiz/progress");
+  return data.progress ?? emptyProgress(userId);
 }
 
-export function applyQuizResult(userId: string, result: QuizResultApply): QuizResultDelta {
-  const current = loadProgress(userId) ?? emptyProgress(userId);
-  const previousBest = current.bestScores[result.organId] ?? null;
-  const improvedAnswers = Math.max(0, result.correctCount - (previousBest ?? 0));
-  const xpFromAnswers = improvedAnswers * 10;
-  const coinsFromAnswers = improvedAnswers;
-  const perfect = result.correctCount === result.total && result.total > 0;
-  const earnedPerfectBonus = perfect && previousBest !== result.total;
-  const xpBonus = earnedPerfectBonus ? 15 : 0;
-  const coinBonus = earnedPerfectBonus ? 3 : 0;
-  const xpEarned = xpFromAnswers + xpBonus;
-  const coinsEarned = coinsFromAnswers + coinBonus;
-  const stars = starsForScore(result.correctCount, result.total);
-
-  const today = todayKey();
-  let streak = current.streak;
-  if (!current.lastQuizDate) {
-    streak = 1;
-  } else if (current.lastQuizDate === today) {
-    streak = Math.max(1, current.streak);
-  } else {
-    const gap = daysBetween(current.lastQuizDate, today);
-    streak = gap === 1 ? current.streak + 1 : 1;
-  }
-
-  const prevStars = current.organStars[result.organId] ?? 0;
-  const nextStars = Math.max(prevStars, stars) as OrganStar;
-  const prevBest = current.bestScores[result.organId] ?? 0;
-  const nextBest = Math.max(prevBest, result.correctCount);
-
-  const badges = new Set<BadgeId>(current.badges);
-  const newBadges: BadgeId[] = [];
-  const unlock = (id: BadgeId) => {
-    if (!badges.has(id)) {
-      badges.add(id);
-      newBadges.push(id);
-    }
+export async function applyQuizResult(
+  userId: string,
+  result: QuizResultApply,
+): Promise<QuizResultDelta> {
+  const data = await apiFetch<QuizResultDelta>("/api/v1/quiz/result", {
+    method: "POST",
+    body: JSON.stringify({
+      organ_id: result.organId,
+      correct_count: result.correctCount,
+      total: result.total,
+    }),
+  });
+  emitChanged();
+  return {
+    ...data,
+    progress: data.progress ?? emptyProgress(userId),
   };
-
-  unlock("first_quiz");
-  if (perfect) unlock("first_perfect");
-
-  const organStars = { ...current.organStars, [result.organId]: nextStars };
-  const starredOrgans = organs.filter((organ) => (organStars[organ.id] ?? 0) >= 1).length;
-  if (starredOrgans >= 3) unlock("three_organs");
-  if (streak >= 7) unlock("streak_7");
-
-  const progress: QuizProgress = {
-    userId,
-    xp: current.xp + xpEarned,
-    coins: current.coins + coinsEarned,
-    streak,
-    lastQuizDate: today,
-    organStars,
-    bestScores: { ...current.bestScores, [result.organId]: nextBest },
-    badges: Array.from(badges),
-  };
-
-  const others = readAll().filter((row) => row.userId !== userId);
-  writeAll([progress, ...others]);
-
-  return { xpEarned, coinsEarned, stars, previousBest, newBadges, progress };
 }
 
 export function subscribeQuizProgress(handler: () => void): () => void {
   window.addEventListener(EVENT, handler);
-  window.addEventListener("storage", handler);
   return () => {
     window.removeEventListener(EVENT, handler);
-    window.removeEventListener("storage", handler);
   };
 }

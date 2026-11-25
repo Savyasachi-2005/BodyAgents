@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { NotebookPen, Trash2, X } from "lucide-react";
 import { useAuth } from "../lib/auth-context";
 import { deleteNote, loadNotes, type StudyNote } from "../lib/notes";
@@ -13,6 +13,20 @@ type Props = {
 export function NotesPanel({ open, onClose }: Props) {
   const { user, requireAuth } = useAuth();
   const [notes, setNotes] = useState<StudyNote[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  const refresh = useCallback(async () => {
+    if (!user) {
+      setNotes([]);
+      return;
+    }
+    try {
+      setNotes(await loadNotes(user.id));
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not load notes");
+    }
+  }, [user]);
 
   useEffect(() => {
     if (!open) return;
@@ -22,17 +36,17 @@ export function NotesPanel({ open, onClose }: Props) {
       onClose();
       return;
     }
-    const refresh = () => setNotes(loadNotes(user.id));
-    refresh();
-    window.addEventListener("bodyagents:notes-changed", refresh);
-    window.addEventListener("storage", refresh);
+    void refresh();
+    const onChanged = () => {
+      void refresh();
+    };
+    window.addEventListener("bodyagents:notes-changed", onChanged);
     window.addEventListener("bodyagents:auth-logout", onClose);
     return () => {
-      window.removeEventListener("bodyagents:notes-changed", refresh);
-      window.removeEventListener("storage", refresh);
+      window.removeEventListener("bodyagents:notes-changed", onChanged);
       window.removeEventListener("bodyagents:auth-logout", onClose);
     };
-  }, [open, user, requireAuth, onClose]);
+  }, [open, user, requireAuth, onClose, refresh]);
 
   if (!open || !user) return null;
 
@@ -56,11 +70,15 @@ export function NotesPanel({ open, onClose }: Props) {
           </div>
         </header>
 
-        {notes.length === 0 ? (
+        {error ? <p className="notes-empty">{error}</p> : null}
+
+        {!error && notes.length === 0 ? (
           <p className="notes-empty">
             No notes yet. In chat, click <b>Note it</b> on a message to save it here.
           </p>
-        ) : (
+        ) : null}
+
+        {notes.length > 0 ? (
           <ul className="notes-list">
             {notes.map((note) => (
               <li key={note.id} className="notes-item">
@@ -74,8 +92,10 @@ export function NotesPanel({ open, onClose }: Props) {
                   type="button"
                   aria-label="Delete note"
                   onClick={() => {
-                    deleteNote(note.id, user.id);
-                    setNotes(loadNotes(user.id));
+                    void (async () => {
+                      await deleteNote(note.id, user.id);
+                      await refresh();
+                    })();
                   }}
                 >
                   <Trash2 size={14} />
@@ -83,7 +103,7 @@ export function NotesPanel({ open, onClose }: Props) {
               </li>
             ))}
           </ul>
-        )}
+        ) : null}
       </section>
     </div>
   );

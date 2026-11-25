@@ -8,8 +8,8 @@ import { addNote, loadNotes } from "../lib/notes";
 import {
   clearChatStorage,
   getOrCreateSessionId,
-  loadStoredMessages,
-  saveStoredMessages,
+  loadChatHistory,
+  saveChatHistory,
   type ChatMessage,
   type ChatSource,
 } from "../lib/chat-storage";
@@ -90,16 +90,9 @@ export function ChatPanel({ philosopherId, onOpenNotes }: Props) {
   const title = useMemo(() => personaLabels[philosopherId] ?? philosopherId, [philosopherId]);
 
   const [input, setInput] = useState("");
-  const [messages, setMessages] = useState<ChatMessage[]>(() => {
-    const userId = user?.id ?? "guest";
-    return loadStoredMessages(
-      philosopherId,
-      userId,
-      createWelcomeMessage(philosopherId, Boolean(user)),
-    );
-  });
-  const [prevPhilosopherId, setPrevPhilosopherId] = useState(philosopherId);
-  const [prevUserId, setPrevUserId] = useState(user?.id ?? null);
+  const [messages, setMessages] = useState<ChatMessage[]>([
+    createWelcomeMessage(philosopherId, Boolean(user)),
+  ]);
   const [streaming, setStreaming] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [status, setStatus] = useState<"idle" | "connecting" | "open" | "error">("idle");
@@ -118,24 +111,30 @@ export function ChatPanel({ philosopherId, onOpenNotes }: Props) {
 
   const userId = user?.id ?? null;
 
-  // Synchronize messages when philosopher or user changes (if not unmounted)
-  if (philosopherId !== prevPhilosopherId || userId !== prevUserId) {
-    setPrevPhilosopherId(philosopherId);
-    setPrevUserId(userId);
-    setMessages(
-      loadStoredMessages(
-        philosopherId,
-        userId ?? "guest",
-        createWelcomeMessage(philosopherId, Boolean(user)),
-      ),
-    );
+  // Load transcript from Mongo when organ or signed-in user changes
+  useEffect(() => {
     setInput("");
     setStreaming(false);
     setError(null);
     setStatus("idle");
     setActiveAssistantId(null);
     assistantIdRef.current = null;
-  }
+
+    const welcome = createWelcomeMessage(philosopherId, Boolean(userId));
+    if (!userId) {
+      setMessages([welcome]);
+      return;
+    }
+
+    let cancelled = false;
+    setMessages([welcome]);
+    void loadChatHistory(philosopherId, userId, welcome).then((next) => {
+      if (!cancelled) setMessages(next);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [philosopherId, userId]);
 
   // Keep the chat transcript pinned inside its own panel — never scroll the page.
   useEffect(() => {
@@ -156,33 +155,43 @@ export function ChatPanel({ philosopherId, onOpenNotes }: Props) {
         socketRef.current = null;
       }
       if (user) {
-        saveStoredMessages(philosopherId, user.id, messagesRef.current);
+        void saveChatHistory(philosopherId, user.id, messagesRef.current);
       }
     };
   }, [philosopherId, user]);
 
-  // Sync noted IDs with saved notes
+  // Sync noted IDs with saved notes (Mongo-backed)
   useEffect(() => {
     if (!user) {
       setNotedIds(new Set());
       return;
     }
+    let cancelled = false;
     const updateNoted = () => {
-      const notes = loadNotes(user.id);
-      const savedTexts = new Set(notes.map((n) => n.text.trim()));
-      const matchingIds = new Set<string>();
-      for (const msg of messages) {
-        const clean = cleanChatText(msg.content).trim();
-        if (clean && savedTexts.has(clean)) {
-          matchingIds.add(msg.id);
-        }
-      }
-      setNotedIds(matchingIds);
+      void loadNotes(user.id)
+        .then((notes) => {
+          if (cancelled) return;
+          const savedTexts = new Set(notes.map((n) => n.text.trim()));
+          const matchingIds = new Set<string>();
+          for (const msg of messages) {
+            const clean = cleanChatText(msg.content).trim();
+            if (clean && savedTexts.has(clean)) {
+              matchingIds.add(msg.id);
+            }
+          }
+          setNotedIds(matchingIds);
+        })
+        .catch(() => {
+          if (!cancelled) setNotedIds(new Set());
+        });
     };
 
     updateNoted();
     window.addEventListener("bodyagents:notes-changed", updateNoted);
-    return () => window.removeEventListener("bodyagents:notes-changed", updateNoted);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("bodyagents:notes-changed", updateNoted);
+    };
   }, [messages, user]);
 
   // Handle user logout - clean everything
@@ -269,7 +278,7 @@ export function ChatPanel({ philosopherId, onOpenNotes }: Props) {
                         }
                       : msg,
                   );
-                  saveStoredMessages(philosopherId, user.id, next);
+                  void saveChatHistory(philosopherId, user.id, next);
                   return next;
                 });
               }
@@ -288,7 +297,7 @@ export function ChatPanel({ philosopherId, onOpenNotes }: Props) {
                       ? { ...msg, content: cleanChatText(msg.content) }
                       : msg,
                   );
-                  saveStoredMessages(philosopherId, user.id, next);
+                  void saveChatHistory(philosopherId, user.id, next);
                   return next;
                 });
               }
@@ -308,7 +317,7 @@ export function ChatPanel({ philosopherId, onOpenNotes }: Props) {
           setActiveAssistantId(id);
           setMessages((prev) => {
             const next: ChatMessage[] = [...prev, { id, role: "assistant" as const, content: raw }];
-            saveStoredMessages(philosopherId, user.id, next);
+            void saveChatHistory(philosopherId, user.id, next);
             return next;
           });
           return;
@@ -327,14 +336,19 @@ export function ChatPanel({ philosopherId, onOpenNotes }: Props) {
     if (!requireAuth() || !user) return;
     const textToSave = cleanChatText(message.content).trim();
     if (!textToSave || message.role === "system") return;
-    addNote({
+    void addNote({
       userId: user.id,
       text: textToSave,
       source: `${title} chat`,
       personaId: philosopherId,
-    });
-    setNotedIds((prev) => new Set(prev).add(message.id));
-    onOpenNotes?.();
+    })
+      .then(() => {
+        setNotedIds((prev) => new Set(prev).add(message.id));
+        onOpenNotes?.();
+      })
+      .catch((err) => {
+        setError(err instanceof Error ? err.message : "Could not save note");
+      });
   };
 
   const toggleListening = () => {
@@ -412,7 +426,7 @@ export function ChatPanel({ philosopherId, onOpenNotes }: Props) {
     const userMessage: ChatMessage = { id: `u-${Date.now()}`, role: "user", content: text };
     setMessages((prev) => {
       const next = [...prev, userMessage];
-      saveStoredMessages(philosopherId, user.id, next);
+      void saveChatHistory(philosopherId, user.id, next);
       return next;
     });
     setStreaming(true);

@@ -9,13 +9,17 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { apiBase } from "./api-client";
 import { clearChatStorage } from "./chat-storage";
+import { migrateLocalDataIfNeeded } from "./migrate-local-data";
 
 export type AuthUser = {
   id: string;
   name: string;
   email: string;
   initials: string;
+  role: "user" | "admin";
+  active: boolean;
 };
 
 type AuthContextValue = {
@@ -31,9 +35,7 @@ type AuthContextValue = {
 
 const TOKEN_KEY = "bodyagents_token";
 
-export function apiBase(): string {
-  return process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
-}
+export { apiBase };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
@@ -60,8 +62,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return;
         }
         const data = (await response.json()) as { user: AuthUser };
+        const nextUser: AuthUser = {
+          ...data.user,
+          role: data.user.role === "admin" ? "admin" : "user",
+          active: data.user.active !== false,
+        };
         setToken(saved);
-        setUser(data.user);
+        setUser(nextUser);
+        void migrateLocalDataIfNeeded(nextUser.id, saved).catch(() => undefined);
       })
       .catch(() => {
         localStorage.removeItem(TOKEN_KEY);
@@ -76,6 +84,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setToken(nextToken);
     setUser(nextUser);
     setLoginOpen(false);
+    void migrateLocalDataIfNeeded(nextUser.id, nextToken).catch(() => undefined);
   }, []);
 
   const logout = useCallback(async () => {

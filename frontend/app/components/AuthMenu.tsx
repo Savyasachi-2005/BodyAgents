@@ -1,10 +1,25 @@
 "use client";
 
 import { FormEvent, useEffect, useRef, useState } from "react";
-import { ChevronDown, LogOut, UserRound } from "lucide-react";
-import { apiBase, useAuth } from "../lib/auth-context";
+import { ChevronDown, LogOut, Shield, UserRound } from "lucide-react";
+import { apiBase, useAuth, type AuthUser } from "../lib/auth-context";
 
-export function AuthMenu() {
+type Props = {
+  onOpenAdmin?: () => void;
+};
+
+function normalizeUser(raw: Partial<AuthUser> & { id: string; name: string; email: string; initials: string }): AuthUser {
+  return {
+    id: raw.id,
+    name: raw.name,
+    email: raw.email,
+    initials: raw.initials,
+    role: raw.role === "admin" ? "admin" : "user",
+    active: raw.active !== false,
+  };
+}
+
+export function AuthMenu({ onOpenAdmin }: Props) {
   const { user, loginOpen, setLoginOpen, setSession, logout } = useAuth();
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [busy, setBusy] = useState(false);
@@ -50,10 +65,10 @@ export function AuthMenu() {
               : "Authentication failed";
         throw new Error(message);
       }
-      if (!data.token) {
+      if (!data.token || !data.user) {
         throw new Error("Authentication failed: missing session token");
       }
-      setSession(data.token, data.user);
+      setSession(data.token, normalizeUser(data.user));
       setPassword("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Authentication failed");
@@ -86,6 +101,18 @@ export function AuthMenu() {
                   <small>{user.email}</small>
                 </div>
               </div>
+              {user.role === "admin" && onOpenAdmin && (
+                <button
+                  type="button"
+                  className="auth-admin"
+                  onClick={() => {
+                    setLoginOpen(false);
+                    onOpenAdmin();
+                  }}
+                >
+                  <Shield size={14} /> Admin
+                </button>
+              )}
               <button
                 type="button"
                 className="auth-logout"

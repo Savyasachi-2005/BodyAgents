@@ -29,11 +29,17 @@ export function ProgressPanel({ open, onClose }: Props) {
       onClose();
       return;
     }
-    const refresh = () => setProgress(loadProgress(user.id));
+    let cancelled = false;
+    const refresh = () => {
+      void loadProgress(user.id).then((next) => {
+        if (!cancelled) setProgress(next);
+      });
+    };
     refresh();
     const unsub = subscribeQuizProgress(refresh);
     window.addEventListener("bodyagents:auth-logout", onClose);
     return () => {
+      cancelled = true;
       unsub();
       window.removeEventListener("bodyagents:auth-logout", onClose);
     };
@@ -157,9 +163,18 @@ export function ProgressChip({ onOpen }: ChipProps) {
       setProgress(null);
       return;
     }
-    const refresh = () => setProgress(loadProgress(user.id));
+    let cancelled = false;
+    const refresh = () => {
+      void loadProgress(user.id).then((next) => {
+        if (!cancelled) setProgress(next);
+      });
+    };
     refresh();
-    return subscribeQuizProgress(refresh);
+    const unsub = subscribeQuizProgress(refresh);
+    return () => {
+      cancelled = true;
+      unsub();
+    };
   }, [user]);
 
   if (!user || !progress) return null;

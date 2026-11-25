@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { OrganViewer } from "./OrganViewer";
 import { ChatPanel } from "./ChatPanel";
+import { AdminPanel } from "./AdminPanel";
 import { AuthMenu } from "./AuthMenu";
 import { NotesPanel } from "./NotesPanel";
 import { ProgressChip, ProgressPanel } from "./ProgressPanel";
@@ -48,6 +49,7 @@ export function AnatomyApp() {
   const [autoRotate, setAutoRotate] = useState(true);
   const [compare, setCompare] = useState(false);
   const [modal, setModal] = useState<Modal>(null);
+  const [adminOpen, setAdminOpen] = useState(false);
   const [notesOpen, setNotesOpen] = useState(false);
   const [progressOpen, setProgressOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -158,7 +160,7 @@ export function AnatomyApp() {
           <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search organs, topics…" />
         </label>
         <ProgressChip onOpen={openProgress} />
-        <AuthMenu />
+        <AuthMenu onOpenAdmin={() => setAdminOpen(true)} />
         <button className="mobile-library-trigger" onClick={() => setMobileLibrary(true)} aria-label="Open organ library"><LibraryBig size={20} /></button>
       </header>
 
@@ -328,6 +330,7 @@ export function AnatomyApp() {
       )}
       <NotesPanel open={notesOpen} onClose={() => setNotesOpen(false)} />
       <ProgressPanel open={progressOpen} onClose={() => setProgressOpen(false)} />
+      <AdminPanel open={adminOpen} onClose={() => setAdminOpen(false)} />
       {mobileLibrary && <button className="drawer-backdrop" aria-label="Close library" onClick={() => setMobileLibrary(false)} />}
     </main>
   );

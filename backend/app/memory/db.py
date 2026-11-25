@@ -33,7 +33,7 @@ async def close_client() -> None:
 
 async def ensure_indexes() -> None:
     """Create only the indexes used by application query paths."""
-    from pymongo import ASCENDING
+    from pymongo import ASCENDING, DESCENDING
 
     settings = get_settings()
     db = get_db()
@@ -45,5 +45,24 @@ async def ensure_indexes() -> None:
         unique=True,
         name="chat_session_lookup",
     )
+    await db[settings.mongodb_sessions_collection].create_index(
+        [("user_id", ASCENDING), ("philosopher_id", ASCENDING)],
+        name="chat_session_by_user_persona",
+    )
+    await db["notes"].create_index(
+        [("user_id", ASCENDING), ("created_at", DESCENDING)],
+        name="notes_user_created",
+    )
+    await db["quiz_progress"].create_index(
+        [("user_id", ASCENDING)],
+        unique=True,
+        name="quiz_progress_user_unique",
+    )
+    await db["quiz_questions"].create_index(
+        [("organ_id", ASCENDING)],
+        unique=True,
+        name="quiz_questions_organ_unique",
+    )
+    await db["users"].create_index([("role", ASCENDING)], name="users_role")
     await db[settings.mongodb_vector_collection].create_index("body_part_id", name="knowledge_body_part")
     await db[settings.mongodb_vector_collection].create_index("chunk_id", unique=True, name="knowledge_chunk_unique")

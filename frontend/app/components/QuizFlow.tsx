@@ -11,6 +11,7 @@ import {
   Star,
   X,
 } from "lucide-react";
+import { fetchOrganQuestions } from "../lib/admin-api";
 import type { Organ } from "../lib/anatomy-data";
 import { quizForOrgan, QUIZ_LENGTH, type QuizQuestion } from "../lib/quiz-data";
 import {
@@ -90,10 +91,10 @@ function selectRandomQuestions(questions: QuizQuestion[], count = QUIZ_LENGTH): 
 }
 
 export function QuizFlow({ organ, userId, onClose }: Props) {
-  const baseQuestions = useMemo(() => quizForOrgan(organ.id).questions, [organ.id]);
-  const [questions, setQuestions] = useState<QuizQuestion[]>(() =>
-    shuffleQuiz(selectRandomQuestions(baseQuestions)),
-  );
+  const fallbackQuestions = useMemo(() => quizForOrgan(organ.id).questions, [organ.id]);
+  const [bank, setBank] = useState<QuizQuestion[]>(fallbackQuestions);
+  const [bankReady, setBankReady] = useState(false);
+  const [questions, setQuestions] = useState<QuizQuestion[]>([]);
   const [index, setIndex] = useState(0);
   const [correctCount, setCorrectCount] = useState(0);
   const [selected, setSelected] = useState<number | null>(null);
@@ -101,6 +102,27 @@ export function QuizFlow({ organ, userId, onClose }: Props) {
   const [phase, setPhase] = useState<Phase>("intro");
   const [result, setResult] = useState<QuizResultDelta | null>(null);
   const stageRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setBankReady(false);
+    setPhase("intro");
+    setIndex(0);
+    setCorrectCount(0);
+    setSelected(null);
+    setAnswers({});
+    setResult(null);
+    void fetchOrganQuestions(organ.id).then((remote) => {
+      if (cancelled) return;
+      const nextBank = remote && remote.length > 0 ? remote : fallbackQuestions;
+      setBank(nextBank);
+      setQuestions(shuffleQuiz(selectRandomQuestions(nextBank)));
+      setBankReady(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [organ.id, fallbackQuestions]);
 
   const question = questions[index];
   const total = questions.length || QUIZ_LENGTH;
@@ -142,13 +164,35 @@ export function QuizFlow({ organ, userId, onClose }: Props) {
   const goNext = () => {
     if (!question) return;
     if (index + 1 >= total) {
-      const delta = applyQuizResult(userId, {
+      void applyQuizResult(userId, {
         organId: organ.id,
         correctCount,
         total,
-      });
-      setResult(delta);
-      setPhase("results");
+      })
+        .then((delta) => {
+          setResult(delta);
+          setPhase("results");
+        })
+        .catch(() => {
+          setResult({
+            xpEarned: 0,
+            coinsEarned: 0,
+            stars: 0,
+            previousBest: null,
+            newBadges: [],
+            progress: {
+              userId,
+              xp: 0,
+              coins: 0,
+              streak: 0,
+              lastQuizDate: null,
+              organStars: {},
+              bestScores: {},
+              badges: [],
+            },
+          });
+          setPhase("results");
+        });
       return;
     }
     setIndex((i) => i + 1);
@@ -157,7 +201,7 @@ export function QuizFlow({ organ, userId, onClose }: Props) {
   };
 
   const startQuiz = () => {
-    setQuestions((current) => shuffleQuiz(selectRandomQuestions(baseQuestions), current));
+    setQuestions((current) => shuffleQuiz(selectRandomQuestions(bank), current));
     setIndex(0);
     setCorrectCount(0);
     setSelected(null);
@@ -187,8 +231,14 @@ export function QuizFlow({ organ, userId, onClose }: Props) {
           <li><Coins size={14} /> Coins + bonus for a perfect 5/5</li>
           <li><Star size={14} /> Stars based on this attempt, saved by best score</li>
         </ul>
-        <button type="button" className="lesson-button" onClick={startQuiz}>
-          Start quiz <ArrowRight size={16} />
+        <button type="button" className="lesson-button" onClick={startQuiz} disabled={!bankReady}>
+          {bankReady ? (
+            <>
+              Start quiz <ArrowRight size={16} />
+            </>
+          ) : (
+            "Loading questions…"
+          )}
         </button>
       </div>
     );
