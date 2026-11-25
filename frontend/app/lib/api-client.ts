@@ -11,11 +11,46 @@ export function getAuthToken(): string | null {
 
 export class ApiError extends Error {
   status: number;
+  notificationHandled: boolean;
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, notificationHandled = false) {
     super(message);
     this.status = status;
+    this.notificationHandled = notificationHandled;
   }
+}
+
+export function isHttpErrorToastHandled(error: unknown): boolean {
+  return error instanceof ApiError && error.notificationHandled;
+}
+
+export function formatHttpStatusMessage(status: number, detail?: string): string {
+  const labels: Record<number, string> = {
+    400: "Bad request",
+    401: "Unauthorized",
+    403: "Forbidden",
+    404: "Not found",
+    408: "Request timed out",
+    409: "Conflict",
+    422: "Validation error",
+    429: "Too many requests",
+    500: "Server error",
+    502: "Bad gateway",
+    503: "Service unavailable",
+    504: "Gateway timed out",
+  };
+  const label = labels[status] ?? "Request failed";
+  return detail ? `${label} (${status}): ${detail}` : `${label} (${status})`;
+}
+
+export function notifyHttpStatusError(status: number, detail?: string): boolean {
+  if (status < 400 || typeof window === "undefined") return false;
+  window.dispatchEvent(
+    new CustomEvent("bodyagents:http-error", {
+      detail: { status, message: formatHttpStatusMessage(status, detail) },
+    }),
+  );
+  return true;
 }
 
 export async function apiFetch<T>(
@@ -44,7 +79,12 @@ export async function apiFetch<T>(
     } catch {
       /* ignore */
     }
-    throw new ApiError(response.status, detail);
+    const notificationHandled = notifyHttpStatusError(response.status, detail);
+    throw new ApiError(
+      response.status,
+      notificationHandled ? formatHttpStatusMessage(response.status, detail) : detail,
+      notificationHandled,
+    );
   }
 
   if (response.status === 204) {

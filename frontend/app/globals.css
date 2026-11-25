@@ -36,6 +36,56 @@ button:focus-visible, input:focus-visible, canvas:focus-visible {
   outline-offset: 3px;
 }
 
+.toast-region {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 1000;
+  width: min(360px, calc(100vw - 32px));
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  pointer-events: none;
+}
+
+.toast-message {
+  min-height: 52px;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 10px 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(255, 251, 244, 0.96);
+  box-shadow: 0 14px 40px rgba(87, 62, 43, 0.16);
+  color: var(--ink);
+  font-size: 13px;
+  pointer-events: auto;
+  animation: toast-in 180ms ease-out;
+}
+
+.toast-message.success > svg { color: var(--sage); }
+.toast-message.error > svg { color: #b44; }
+
+.toast-message button {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+}
+
+.toast-message button:hover { background: rgba(117, 91, 70, 0.08); }
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 .app-shell {
   min-height: 100vh;
   padding: 22px 24px 24px;

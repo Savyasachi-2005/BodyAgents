@@ -25,6 +25,8 @@ import {
 import { organs, type OrganId } from "../lib/anatomy-data";
 import type { QuizQuestion } from "../lib/quiz-data";
 import { useAuth } from "../lib/auth-context";
+import { useToast } from "../lib/toaster";
+import { isHttpErrorToastHandled } from "../lib/api-client";
 
 type Props = {
   open: boolean;
@@ -43,6 +45,7 @@ const emptyQuestion = (organId: OrganId, index: number): QuizQuestion => ({
 
 export function AdminPanel({ open, onClose }: Props) {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [tab, setTab] = useState<Tab>("quizzes");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -140,8 +143,11 @@ export function AdminPanel({ open, onClose }: Props) {
         return [...others, saved].sort((a, b) => a.organId.localeCompare(b.organId));
       });
       setDirty(false);
+      toast("Quiz bank saved");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Save failed");
+      const message = err instanceof Error ? err.message : "Save failed";
+      setError(message);
+      if (!isHttpErrorToastHandled(err)) toast(message, "error");
     } finally {
       setBusy(false);
     }
@@ -161,8 +167,11 @@ export function AdminPanel({ open, onClose }: Props) {
           row.user.id === updated.id ? { ...row, user: { ...row.user, ...updated } } : row,
         ),
       );
+      toast("User updated");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Update failed");
+      const message = err instanceof Error ? err.message : "Update failed";
+      setError(message);
+      if (!isHttpErrorToastHandled(err)) toast(message, "error");
     } finally {
       setBusy(false);
     }
@@ -173,8 +182,11 @@ export function AdminPanel({ open, onClose }: Props) {
     setError(null);
     try {
       await downloadProgressExcel(uid);
+      toast(uid ? "Learner progress exported" : "Progress exported");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Export failed");
+      const message = err instanceof Error ? err.message : "Export failed";
+      setError(message);
+      if (!isHttpErrorToastHandled(err)) toast(message, "error");
     } finally {
       setBusy(false);
     }

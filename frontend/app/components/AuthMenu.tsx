@@ -3,6 +3,8 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { ChevronDown, LogOut, Shield, UserRound } from "lucide-react";
 import { apiBase, useAuth, type AuthUser } from "../lib/auth-context";
+import { formatHttpStatusMessage } from "../lib/api-client";
+import { useToast } from "../lib/toaster";
 
 type Props = {
   onOpenAdmin?: () => void;
@@ -21,6 +23,7 @@ function normalizeUser(raw: Partial<AuthUser> & { id: string; name: string; emai
 
 export function AuthMenu({ onOpenAdmin }: Props) {
   const { user, loginOpen, setLoginOpen, setSession, logout } = useAuth();
+  const { toast } = useToast();
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -56,13 +59,14 @@ export function AuthMenu({ onOpenAdmin }: Props) {
         user?: any;
       };
       if (!response.ok) {
-        const detail = data.detail;
-        const message =
-          typeof detail === "string"
-            ? detail
-            : Array.isArray(detail)
-              ? detail.map((item: { msg?: string }) => item.msg).filter(Boolean).join(", ")
+        const rawDetail = data.detail;
+        const detail =
+          typeof rawDetail === "string"
+            ? rawDetail
+            : Array.isArray(rawDetail)
+              ? rawDetail.map((item: { msg?: string }) => item.msg).filter(Boolean).join(", ")
               : "Authentication failed";
+        const message = formatHttpStatusMessage(response.status, detail);
         throw new Error(message);
       }
       if (!data.token || !data.user) {
@@ -70,8 +74,11 @@ export function AuthMenu({ onOpenAdmin }: Props) {
       }
       setSession(data.token, normalizeUser(data.user));
       setPassword("");
+      toast(mode === "signup" ? "Account created successfully" : "Signed in successfully");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Authentication failed");
+      const message = err instanceof Error ? err.message : "Authentication failed";
+      setError(message);
+      toast(message, "error");
     } finally {
       setBusy(false);
     }
@@ -119,6 +126,7 @@ export function AuthMenu({ onOpenAdmin }: Props) {
                 onClick={async () => {
                   await logout();
                   setLoginOpen(false);
+                  toast("Signed out successfully");
                 }}
               >
                 <LogOut size={14} /> Sign out

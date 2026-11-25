@@ -5,6 +5,8 @@ import { Lock, MessageCircle, Mic, MicOff, NotebookPen, Send, Sparkles } from "l
 import { useAuth } from "../lib/auth-context";
 import { personaLabels, type PersonaId } from "../lib/personas";
 import { addNote, loadNotes } from "../lib/notes";
+import { isHttpErrorToastHandled } from "../lib/api-client";
+import { useToast } from "../lib/toaster";
 import {
   clearChatStorage,
   getOrCreateSessionId,
@@ -87,6 +89,7 @@ function createWelcomeMessage(philosopherId: PersonaId, hasUser: boolean): ChatM
 
 export function ChatPanel({ philosopherId, onOpenNotes }: Props) {
   const { user, requireAuth } = useAuth();
+  const { toast } = useToast();
   const title = useMemo(() => personaLabels[philosopherId] ?? philosopherId, [philosopherId]);
 
   const [input, setInput] = useState("");
@@ -344,10 +347,13 @@ export function ChatPanel({ philosopherId, onOpenNotes }: Props) {
     })
       .then(() => {
         setNotedIds((prev) => new Set(prev).add(message.id));
+        toast("Note saved");
         onOpenNotes?.();
       })
       .catch((err) => {
-        setError(err instanceof Error ? err.message : "Could not save note");
+        const message = err instanceof Error ? err.message : "Could not save note";
+        setError(message);
+        if (!isHttpErrorToastHandled(err)) toast(message, "error");
       });
   };
 

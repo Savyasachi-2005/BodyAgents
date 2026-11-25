@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 import { NotebookPen, Trash2, X } from "lucide-react";
 import { useAuth } from "../lib/auth-context";
 import { deleteNote, loadNotes, type StudyNote } from "../lib/notes";
+import { isHttpErrorToastHandled } from "../lib/api-client";
+import { useToast } from "../lib/toaster";
 
 type Props = {
   open: boolean;
@@ -12,6 +14,7 @@ type Props = {
 
 export function NotesPanel({ open, onClose }: Props) {
   const { user, requireAuth } = useAuth();
+  const { toast } = useToast();
   const [notes, setNotes] = useState<StudyNote[]>([]);
   const [error, setError] = useState<string | null>(null);
 
@@ -93,8 +96,15 @@ export function NotesPanel({ open, onClose }: Props) {
                   aria-label="Delete note"
                   onClick={() => {
                     void (async () => {
-                      await deleteNote(note.id, user.id);
-                      await refresh();
+                      try {
+                        await deleteNote(note.id, user.id);
+                        await refresh();
+                        toast("Note deleted");
+                      } catch (err) {
+                        if (!isHttpErrorToastHandled(err)) {
+                          toast(err instanceof Error ? err.message : "Could not delete note", "error");
+                        }
+                      }
                     })();
                   }}
                 >

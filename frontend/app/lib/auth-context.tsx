@@ -9,7 +9,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { apiBase } from "./api-client";
+import { apiBase, notifyHttpStatusError } from "./api-client";
 import { clearChatStorage } from "./chat-storage";
 import { migrateLocalDataIfNeeded } from "./migrate-local-data";
 
@@ -56,6 +56,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })
       .then(async (response) => {
         if (!response.ok) {
+          notifyHttpStatusError(response.status);
           localStorage.removeItem(TOKEN_KEY);
           setToken(null);
           setUser(null);

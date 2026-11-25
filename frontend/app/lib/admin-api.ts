@@ -1,4 +1,11 @@
-import { apiBase, apiFetch, getAuthToken } from "./api-client";
+import {
+  ApiError,
+  apiBase,
+  apiFetch,
+  formatHttpStatusMessage,
+  getAuthToken,
+  notifyHttpStatusError,
+} from "./api-client";
 import type { OrganId } from "./anatomy-data";
 import type { QuizQuestion } from "./quiz-data";
 import type { QuizProgress } from "./quiz-progress";
@@ -65,7 +72,14 @@ export async function downloadProgressExcel(userId?: string): Promise<void> {
     headers: token ? { Authorization: `Bearer ${token}` } : undefined,
   });
   if (!response.ok) {
-    throw new Error("Excel export failed");
+    const notificationHandled = notifyHttpStatusError(response.status, "Excel export failed");
+    throw new ApiError(
+      response.status,
+      notificationHandled
+        ? formatHttpStatusMessage(response.status, "Excel export failed")
+        : "Excel export failed",
+      notificationHandled,
+    );
   }
   const blob = await response.blob();
   const url = URL.createObjectURL(blob);
